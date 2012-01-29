@@ -1,0 +1,23 @@
+# Block 127 
+A script taking few blacklist and generate an ignore list from them.
+Copyright (C) 2012 Psychedelys <psychedelys@gmail.com>
+http://github.com/psychedelys/block_127
+
+
+Generate few rules for Bind, SquidGuard, Shorewall to automatically discard all traffics comming from those source:
+
+The script download few blacklists available and merge them into a master blacklist. Blacklist containing severals sections are just used for some category.
+
+*Bind:
+
+Local cache server is answering 127.0.0.1 to all selected blacklist domains. Possibility is also to redirect all traffic to a local IP hosting an inetsim (inetsim.org) to log all the traffic.
+
+* SquidGuard (in progress):
+
+SquidGuard used with a Squid below. All bad URL and IP from master blacklist are injected inside. The injection mechanism will be differential.
+
+
+* Shorewall (in progress):
+
+Simply also add the list to the DROP shorewall blacklist. Be carrefull that this can be really be huged and slow down the connection. Furthermore this should not be considerate as really safe, as some DNS malware are using some well-known IP during most of the time and swap to a dirty IP for a short time period.
+
