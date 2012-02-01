@@ -153,12 +153,8 @@ push ( @{$databases}, {
 # http://squidguard.mesd.k12.or.us/blacklists.tgz
 # http://cri.univ-tlse1.fr/documentations/cache/squidguard_en.html#contrib
 # http://doc.pfsense.org/index.php/SquidGuard_package
-# BCWF - https://list.bluecoat.com/bcwf/activity/download/bcwf.db
-# IWF - https://list.bluecoat.com/iwf/activity/download/iwf.db
 # Websense - download.websense.com
 # SmartFilter - list.smartfilter.com
-# Proventia - https://list.bluecoat.com/proventia/activity/download/proventia.db
-# Optenet - https://list.bluecoat.com/optenet/activity/download/optenet.db
 
 =head1 
 
