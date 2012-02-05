@@ -23,6 +23,7 @@ use File::Copy;
 use Date::Format( 'time2str' ) ;
 use File::Basename;
 use Config::IniFiles;
+use File::Spec;
 
 my $debug = 0;
 my $verbose = 0;
@@ -34,15 +35,18 @@ sub metaprint ($$)
     print time2str("%T", time()) . " - [".uc($level)."] - " . ( (caller(1))[3] ? (caller(1))[3] :'') . " - " . ( (caller(0))[2] ? 'L'.(caller(0))[2].' - ' :'') . $display . "\n";
 }
 
+my $abs_path = dirname( File::Spec->rel2abs($0) );
+print "Current script path is: '$abs_path'\n";
+
 =head1
 
 Load parameters from the ini files.
 
 =cut
 
-my $ini = "../ini/global.ini";
+my $ini = "$abs_path/../ini/global.ini";
 if ( ( !-f $ini ) &&  ( !-r $ini ) ) {
-    metaprint 'critic', "The ini file is not found, aborting";
+    metaprint 'critic', "The ini file is not found or not readable, aborting";
     exit 1;
 }
 
@@ -61,6 +65,8 @@ if ( !defined($Bind_Env) || ( $Bind_Env =~ /^\s*$/ ) ) {
     metaprint 'critic', "The Bind path doesnot exist";
     exit 1;
 }
+my $user_agent = $cfg->val( 'global', 'UA' );
+$user_agent = 'Mozilla/4.73 [en] (X11; I; Linux 2.2.16 i686; Nav)' if ( !defined($user_agent) || ( $user_agent =~ /^\s*$/ ) );
 
 my $Bind_zone_prod = "$Temp_Path/named.conf.block";
 my $Bind_zone_prod_old = "$Temp_Path/named.conf.block.old";
@@ -69,7 +75,11 @@ my $Bind_block_file = "$Temp_Path/blockeddomain.hosts";
 
 my $Blacklist_tmp_file = "$Temp_Path/result";
 
-# END of move to the ini file
+my $white_file = "$abs_path/" . $cfg->val( 'global', 'whitelist');
+if ( ( ! -f $white_file ) &&  ( !-r $white_file ) ) {
+    metaprint 'critic', "Whitelist file is not found or not readable, aborting";
+    exit 1;
+}
 
 my $databases = [];
 
@@ -166,9 +176,36 @@ my $blacklist='';
 my $Fileout;
 my $Blacklist_tmp_Domain = '';
 my $Blacklist_Domain = ();
+my $Whitelist_Domain = ();
 my $dom = {};
 
-sub rec1 ($$$$) {
+sub load_list ($)
+{
+    my ( $file ) = @_;
+
+    my $list = ();
+    my $filein;
+    open ( $filein, "<$file");
+
+    while ( my $dmn = <$filein> ) {
+        next if ( $dmn =~/^#/ );
+        chomp($dmn);
+        $dmn =~s/\r+//g;
+        $dmn =~s/#.*$//g;
+        $dmn =~s/\s*//g;
+        next if ( $dmn =~/^\s*$/ );
+        my $n = () = $dmn =~ /\./g;
+
+        # print "#dot:" . $n . ":$dmn:" . "\n";
+        next if ( $n < 1 );
+        push (@$list, $dmn );
+    }
+    close ( $filein );
+    return $list;
+}
+
+sub rec1 ($$$$)
+{
     my ( $subdom, $empty, $i, $hash ) = @_;
 
     if ( $i < 0 ) {
@@ -188,9 +225,11 @@ sub rec1 ($$$$) {
     return $hash;
 }
 
-sub generate_tree ($$$)
+sub generate_tree ($$$$)
 {
-    my ( $Blacklist_Domain, $Blacklist_1_Domain, $debug ) = @_;
+    my ( $Blacklist_Domain, $Blacklist_1_Domain, $Whitelist_Domain, $debug ) = @_;
+
+    my $wfound = 0;
     foreach my $d ( split ('\n', $Blacklist_1_Domain ) ) {
         next if ( $d =~/^\s*$/ );
         $d =~s/#.*$//g;
@@ -199,6 +238,23 @@ sub generate_tree ($$$)
         $d =~s/\s*$//g;
         next if ( $d eq 'localhost' );
         print "-->".$d . "\n" if $verbose;
+
+        $wfound = 0;
+        if ( defined($Whitelist_Domain) ) {
+            foreach my $w ( @$Whitelist_Domain ) {
+                # if ( ( $d =~ /\.$w$/ ) || ( $d =~ /^$w$/ ) ) {
+                if ( $d =~ /^$w$/ ) {
+                    print "'$d' is matching '$w' from whitelist.\n";
+                    $wfound = 1;
+                    last;
+                }
+            }
+        }
+        if ( $wfound ) {
+            print "'$d' is matching the whitelist, skipping.\n";
+            next;
+        }
+
         my @tmp = split(/\./, $d );
         print Dumper (\@tmp) if $debug;
 
@@ -377,10 +433,13 @@ if ( -f $Blacklist_tmp_file ) {
     system("rm -f $Blacklist_tmp_file");
 }
 
+$Whitelist_Domain = load_list ( $white_file );
+print "White_List_Domain:" . Dumper ( $Whitelist_Domain );
+
 my $fromcache = 0;
 
 # TODO: move user-agent to header...
-my $ua = LWP::UserAgent->new(agent => 'Mozilla/4.73 [en] (X11; I; Linux 2.2.16 i686; Nav)' );
+my $ua = LWP::UserAgent->new(agent => $user_agent);
 if ( defined($http_proxy) && ( $http_proxy !~ /^\s*$/ ) ) {
     $ua->proxy('http', $http_proxy );
 }
@@ -580,7 +639,7 @@ $Blacklist_tmp_Domain = `grep -v '^localhost\$' $Blacklist_tmp_file | grep -v -e
 # Bind Stuff
 
 metaprint 'info', "generating listing";
-$Blacklist_Domain = generate_tree ( $Blacklist_Domain, $Bind_Blacklist_tmp_Domain, $debug );
+$Blacklist_Domain = generate_tree ( $Blacklist_Domain, $Bind_Blacklist_tmp_Domain, $Whitelist_Domain, $debug );
 
 # print Dumper ( $Blacklist_Domain );
 
