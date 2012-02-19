@@ -717,7 +717,7 @@ foreach my $database ( @{$databases} ) {
         }
     }
 
-    #foreach my $str ( $content )
+    #foreach my $str ( $content ) {
     # $n = () = $str =~ /\./g;
     # print $n;
     #}
@@ -802,7 +802,7 @@ foreach my $database ( @{$databases} ) {
                 } elsif ( $database->{'Type'} eq 'adblock-expressions' ) {
 
               # https://bugs.launchpad.net/ubuntu/+source/squidguard/+bug/316816
-                    $cmd = "sed -e '/@@.*/d' -e '/^!.*/d' -e '/^\\\[.*\\\]\$/d' -e 's#http://#^#g' -e 's,[.?=&/|()[],\\\\&,g' -e 's#*#.*#g' -e 's,\\\$.*\$,,g' -e 's/^-/\\\\-/' -e 's/^\+/\\\\+/' $file_to_process > $outfile";
+                    $cmd = "sed -e '/@@.*/d' -e '/^!.*/d' -e '/^\\\[.*\\\]\$/d' -e 's#http://#^#g' -e 's,[.?=&/|()[],\\\\&,g' -e 's#*#.*#g' -e 's,\\\$.*\$,,g' -e 's/^-/\\\\-/' -e 's/^\+/\\\\+/' -e '/^\\\.\\\*\$/d' $file_to_process > $outfile";
 
 #A crude removal of the lines:
 # /.*\\9.*/d;
