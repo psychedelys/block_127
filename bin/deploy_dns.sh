@@ -7,8 +7,11 @@ cfg.parser ()
     ini="$(<$1)"                # read the file
     ini="${ini//[/\[}"          # escape [
     ini="${ini//]/\]}"          # escape ]
+    ini="${ini//(/\(}"          # escape (
+    ini="${ini//)/\)}"          # escape )
+    ini="${ini//;/\;}"          # escape ;
     IFS=$'\n' && ini=( ${ini} ) # convert to line-array
-    ini=( ${ini[*]//;*/} )      # remove comments with ;
+    ini=( ${ini[*]//^#*/} )     # remove comments line with #
     ini=( ${ini[*]/\    =/=} )  # remove tabs before =
     ini=( ${ini[*]/=\   /=} )   # remove tabs be =
     ini=( ${ini[*]/\ =\ /=} )   # remove anything with a space around =
