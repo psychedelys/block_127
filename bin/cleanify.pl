@@ -46,7 +46,7 @@ Load parameters from the ini files.
 
 my $ini = "$abs_path/../ini/global.ini";
 if ( ( !-f $ini ) &&  ( !-r $ini ) ) {
-    metaprint 'critic', "The ini file is not found or not readable, aborting";
+    metaprint 'critic', "The ini file is not found or not readable, aborting.";
     exit 1;
 }
 
@@ -59,19 +59,26 @@ my $http_proxy = $cfg->val( 'global', 'http_proxy' );
 
 my $Bind_Env = $cfg->val( 'global', 'bind_path' );
 if ( !defined($Bind_Env) || ( $Bind_Env =~ /^\s*$/ ) ) {
-    metaprint 'critic', "The Bind path is empty";
+    metaprint 'critic', "The Bind path is empty.";
     exit 1;
 } elsif  ( !-d $Bind_Env ) {
-    metaprint 'critic', "The Bind path doesnot exist";
+    metaprint 'critic', "The Bind path doesnot exist.";
     exit 1;
 }
 my $user_agent = $cfg->val( 'global', 'UA' );
 $user_agent = 'Mozilla/4.73 [en] (X11; I; Linux 2.2.16 i686; Nav)' if ( !defined($user_agent) || ( $user_agent =~ /^\s*$/ ) );
 
+my $SquidGuard_db_Env = $cfg->val( 'global', 'squid_db_path' );
+if ( !defined($SquidGuard_db_Env) || ( $SquidGuard_db_Env =~ /^\s*$/ ) ) {
+    metaprint 'critic', "The SquidGuard_db_Env is not defined.";
+    exit 1;
+}
+
 my $Bind_zone_prod = "$Temp_Path/named.conf.block";
 my $Bind_zone_prod_old = "$Temp_Path/named.conf.block.old";
 my $Bind_zone_new = "$Temp_Path/named.conf.block.new";
 my $Bind_block_file = "$Temp_Path/blockeddomain.hosts";
+my $SquidGuard_conf_file = "$Temp_Path/squidGuard.conf";
 
 my $Blacklist_tmp_file = "$Temp_Path/result";
 
@@ -83,6 +90,12 @@ if ( ( ! -f $white_file ) &&  ( !-r $white_file ) ) {
 
 my $databases = [];
 
+=head1
+
+  To be moved to an iniFile
+
+=cut
+
 push ( @{$databases}, {
         Title => 'winhelp2002',
         Activ => 1,
@@ -91,6 +104,7 @@ push ( @{$databases}, {
         # MD5: http://winhelp2002.mvps.org/hosts.htm
         # Timestamp: http://winhelp2002.mvps.org/hosts.htm
         Category => 'winhelp2002',
+        Type => 'domains',
         Script => 'v1',
         For => 'Bind,Squid,Shorewall',
         Local => "$Temp_Path/hosts1.txt",
@@ -103,6 +117,7 @@ push ( @{$databases}, {
         TimeStamp => 'http://mirror1.malwaredomains.com/files/timestamp',
         MD5 => 'http://mirror1.malwaredomains.com/files/md5',
         Category => 'MalwareDomains',
+        Type => 'domains',
         Script => 'v1',
         For => 'Bind,Squid,Shorewall',
         Local => "$Temp_Path/hosts2.txt",
@@ -113,6 +128,7 @@ push ( @{$databases}, {
         Activ => 1,
         URL => 'http://www.abuse.ch/spyeyetracker/blocklist.php?download=domainblocklist',
         Category => 'Abuse.ch/SpyEye',
+        Type => 'domains',
         Script => 'v1',
         For => 'Bind,Squid,Shorewall',
         Local => "$Temp_Path/hosts3.txt",
@@ -122,6 +138,7 @@ push ( @{$databases}, {
         Title => 'zeus',
         Activ => 1,
         URL => 'http://www.abuse.ch/zeustracker/blocklist.php?download=domainblocklist',
+        Type => 'domains',
         Category => 'Abuse.ch/Zeus',
         Script => 'v1',
         For => 'Bind,Squid,Shorewall',
@@ -133,6 +150,7 @@ push ( @{$databases}, {
         Activ => 1,
         URL => 'http://amada.abuse.ch/blocklist.php?download=domainblocklist',
         Category => 'Abuse.ch/Amada',
+        Type => 'domains',
         Script => 'v1',
         For => 'Bind,Squid,Shorewall',
         Local => "$Temp_Path/hosts5.txt",
@@ -151,16 +169,74 @@ push ( @{$databases}, {
     });
 
 push ( @{$databases}, {
-        Title => 'IWF',
-        Activ => 0,
-        URL => 'http://',
-        Category => 'IWF',
-        Script => 'v4',
-        For => 'Bind,Squid,Shorewall',
-        Local => "$Temp_Path/hosts7.txt",
+        Title => 'EasyList',
+        Activ => 1,
+        URL => 'https://easylist-downloads.adblockplus.org/easylist.txt',
+        Category => 'adblock/EasyList',
+        Type => 'adblock-expressions',
+        Script => '',
+        For => 'Squid',
+        Local => "$Temp_Path/pattern1.txt",
     });
 
-# http://squidguard.mesd.k12.or.us/blacklists.tgz
+push ( @{$databases}, {
+        Title => 'EasyPrivacy',
+        Activ => 1,
+        URL => 'https://easylist-downloads.adblockplus.org/easyprivacy.txt',
+        Category => 'adblock/EasyPrivacy',
+        Type => 'adblock-expressions',
+        Script => '',
+        For => 'Squid',
+        Local => "$Temp_Path/pattern2.txt",
+    });
+
+
+push ( @{$databases}, {
+        Title => 'adversity-tracking',
+        Activ => 1,
+        URL => 'https://adversity.googlecode.com/hg/Adversity-Tracking.txt',
+        Category => 'adversity/Tracking',
+        Type => 'adblock-expressions',
+        Script => '',
+        For => 'Squid',
+        Local => "$Temp_Path/pattern3.txt",
+    });
+
+push ( @{$databases}, {
+        Title => 'adversity-adult',
+        Activ => 1,
+        URL => 'https://adversity.googlecode.com/hg/Adversity-Adult.txt',
+        Category => 'adversity/adult',
+        Type => 'adblock-expressions',
+        Script => '',
+        For => 'Squid',
+        Local => "$Temp_Path/pattern4.txt",
+    });
+
+push ( @{$databases}, {
+        Title => 'adversity-p2p',
+        Activ => 1,
+        URL => 'https://adversity.googlecode.com/hg/Adversity-p2p.txt',
+        Category => 'adversity/p2p',
+        Type => 'adblock-expressions',
+        Script => '',
+        For => 'Squid',
+        Local => "$Temp_Path/pattern5.txt",
+    });
+
+push ( @{$databases}, {
+        Title => 'adversity-antisocial',
+        Activ => 1,
+        URL => 'https://adversity.googlecode.com/hg/Antisocial.txt',
+        Category => 'adversity/antisocial',
+        Type => 'adblock-expressions',
+        Script => '',
+        For => 'Squid',
+        Local => "$Temp_Path/pattern6.txt",
+    });
+
+
+
 # http://cri.univ-tlse1.fr/documentations/cache/squidguard_en.html#contrib
 # http://doc.pfsense.org/index.php/SquidGuard_package
 # Websense - download.websense.com
@@ -242,16 +318,17 @@ sub generate_tree ($$$$)
         $wfound = 0;
         if ( defined($Whitelist_Domain) ) {
             foreach my $w ( @$Whitelist_Domain ) {
+
                 # if ( ( $d =~ /\.$w$/ ) || ( $d =~ /^$w$/ ) ) {
                 if ( $d =~ /^$w$/ ) {
-                    print "'$d' is matching '$w' from whitelist.\n";
+                    print "'$d' is matching '$w' from whitelist.\n" if $debug;
                     $wfound = 1;
                     last;
                 }
             }
         }
         if ( $wfound ) {
-            print "'$d' is matching the whitelist, skipping.\n";
+            metaprint  'info',"'$d' is matching the whitelist, skipping.";
             next;
         }
 
@@ -266,7 +343,7 @@ sub generate_tree ($$$$)
     return $Blacklist_Domain;
 }
 
-sub generate_file ($$$$)
+sub generate_bind_zone_file ($$$$)
 {
     my ($Blacklist_Domain, $suffix, $file_out, $level ) = @_;
 
@@ -276,7 +353,7 @@ sub generate_file ($$$$)
             $suffix = '';
         }
         if ( $Blacklist_Domain->{$d1} =~ /HASH\(/ ) {
-            generate_file ( $Blacklist_Domain->{$d1}, "$d1.$suffix", $file_out, $level+1 );
+            generate_bind_zone_file ( $Blacklist_Domain->{$d1}, "$d1.$suffix", $file_out, $level+1 );
         } else {
             $suffix =~s/\.$//;
             print $file_out "zone \"$d1.$suffix\" { type master; notify no; file \"$Bind_Env/blockeddomain.hosts\"; };\n";
@@ -391,24 +468,17 @@ sub Get_HTTP_File ($$$$)
     return ( $local_version, $req_http );
 }
 
-sub Dump_to_disk ($$)
+sub Bind_Dump_to_disk ($$)
 {
     my ( $database, $file ) = @_;
 
     my $Blacklist_tmp_Domain = '';
 
     if ( ( !defined($database->{'Script'}) ) || ( $database->{'Script'} =~/^\s*$/ ) ) {
-        next;
+        return '';
     } elsif ( $database->{'Script'} eq 'v1' ) {
-
         my $cmd = "grep -v '^#' $file | grep -v -e '^\$' | grep -v '^localhost\$' | awk -F. '{ print NF,\$ARGIND }' | sort -n | awk '{ print \$2 }' | uniq";
         $Blacklist_tmp_Domain = `$cmd`;
-
-    } elsif ( $database->{'Script'} eq 'v2' ) {
-
-        my $cmd = "grep '^zone ' $file | awk '{ print \$2 }' | sed 's/\"//g' | grep -v -e '^\$' | awk -F. '{ print NF,\$ARGIND }' | sort -n | awk '{ print \$2 }' | grep -v -e '^\$' | grep -v '^localhost\$' | uniq";
-        $Blacklist_tmp_Domain = `$cmd`;
-
     }
     return $Blacklist_tmp_Domain;
 }
@@ -429,14 +499,31 @@ sub Check_Directory ($)
     }
 }
 
+=head1
+
+ Main
+
+=cut
+
 if ( -f $Blacklist_tmp_file ) {
     system("rm -f $Blacklist_tmp_file");
 }
+if ( -d $Temp_Path . '/cleanify/' ) {
+    system("rm -rf $Temp_Path/cleanify");
+}
+
+=head2
+Loading the Whitelist
+=cut
 
 $Whitelist_Domain = load_list ( $white_file );
-print "White_List_Domain:" . Dumper ( $Whitelist_Domain );
+metaprint 'info', "White_List_Domain:" . Dumper ( $Whitelist_Domain );
 
 my $fromcache = 0;
+
+=head2
+Initialisation of the Web Content fetcher
+=cut
 
 # TODO: move user-agent to header...
 my $ua = LWP::UserAgent->new(agent => $user_agent);
@@ -445,11 +532,23 @@ if ( defined($http_proxy) && ( $http_proxy !~ /^\s*$/ ) ) {
 }
 $ua->timeout(10);
 
+=head2
+For each databases defined, process it carrefully...
+=cut
+
+metaprint 'info',"Refreshing databases if needed.";
+
+my $squid_cat_to_generate = ();
+
 my $local_version = 0;
 foreach my $database ( @{$databases} ) {
     next if ( !$database->{'Activ'} );
     $local_version = 0;
+    print "=============\n\n";
     metaprint 'info', "Running Blacklist " . $database->{'Title'};
+
+    # TODO to be moved in the iniFile Database loader.
+    $database->{'Category'} = lc($database->{'Category'});
 
     $fromcache = 0;
     if ( ( -f $database->{'Local'} ) && ( -w $database->{'Local'} ) ) {
@@ -534,9 +633,10 @@ foreach my $database ( @{$databases} ) {
 
     }
 
-    my $to_extract = ();
+    my $to_extract_for_bind = ();
+    my $to_extract_for_squid = ();
 
-    if ( $database->{'Local'} =~/\.gz$/ ) {
+    if ( $database->{'Local'} =~/\.tar\.gz$/ ) {
 
         my $tar = Archive::Tar->new( $database->{'Local'} );
         if ( !defined($tar) ) {
@@ -557,13 +657,25 @@ foreach my $database ( @{$databases} ) {
 
         Check_Directory ( $Temp_Path . '/' . $database->{'Title'} );
 
-        # BL/gamble/domains
+        # BL/category/domains or BL/category/urls
         foreach my $file ( @$tar_files ) {
             foreach my $ext ( @$tar_ext ) {
                 if ( $file eq 'BL/'.$ext.'/domains' ) {
                     Check_Directory ( $Temp_Path . '/' . $database->{'Title'} . '/' . $ext );
                     $tar->extract_file( $file, $Temp_Path . '/' . $database->{'Title'} . '/' . $ext . '/domains' );
-                    push ( @$to_extract, $Temp_Path . '/' . $database->{'Title'} . '/' . $ext . '/domains' );
+                    if ( $database->{'For'} =~/Bind/ ) {
+                        push ( @$to_extract_for_bind, $Temp_Path . '/' . $database->{'Title'} . '/' . $ext . '/domains' );
+                    }
+                    if ( $database->{'For'} =~/Squid/ ) {
+                        push ( @$to_extract_for_squid, $Temp_Path . '/' . $database->{'Title'} . '/' . $ext . '/domains' );
+                    }
+
+                } elsif ( $file eq 'BL/'.$ext.'/urls' ) {
+                    Check_Directory ( $Temp_Path . '/' . $database->{'Title'} . '/' . $ext );
+                    $tar->extract_file( $file, $Temp_Path . '/' . $database->{'Title'} . '/' . $ext . '/urls' );
+                    if ( $database->{'For'} =~/Squid/ ) {
+                        push ( @$to_extract_for_squid, $Temp_Path . '/' . $database->{'Title'} . '/' . $ext . '/urls' );
+                    }
                 }
             }
         }
@@ -590,10 +702,19 @@ foreach my $database ( @{$databases} ) {
         open ( $Fileout, '>'.$database->{'Local'} );
         print $Fileout $content."\n";
         close $Fileout;
-
-        push ( @$to_extract, $database->{'Local'} );
+        if ( $database->{'For'} =~/Bind/ ) {
+            push ( @$to_extract_for_bind, $database->{'Local'} );
+        }
+        if ( $database->{'For'} =~/Squid/ ) {
+            push ( @$to_extract_for_squid, $database->{'Local'} );
+        }
     } elsif ( $local_version == 1 ) {
-        push ( @$to_extract, $database->{'Local'} );
+        if ( $database->{'For'} =~/Bind/ ) {
+            push ( @$to_extract_for_bind, $database->{'Local'} );
+        }
+        if ( $database->{'For'} =~/Squid/ ) {
+            push ( @$to_extract_for_squid, $database->{'Local'} );
+        }
     }
 
     #foreach my $str ( $content )
@@ -601,27 +722,113 @@ foreach my $database ( @{$databases} ) {
     # print $n;
     #}
 
-    print Dumper ( $to_extract ); # if $verbose;
-
-    $Blacklist_tmp_Domain = '';
-    foreach my $file_to_process ( @$to_extract ) {
-        $Blacklist_tmp_Domain .= Dump_to_disk ( $database, $file_to_process );
-        $Blacklist_tmp_Domain .= "\n";
-
-        my $nb_of_lines = $Blacklist_tmp_Domain =~ tr/\n//;
-        metaprint 'info', "Cummulative number of lines for this Blacklist in '$file_to_process' is '$nb_of_lines'";
+    if ($verbose) {
+        print "List to extract for Bind:" . Dumper ( $to_extract_for_bind );
+        print "List to extract for Squid:" . Dumper ( $to_extract_for_squid );
     }
 
-    if ( $Blacklist_tmp_Domain !~/^\s*$/ ) {
-        open ( $Fileout, ">>$Blacklist_tmp_file" );
-        print $Fileout $Blacklist_tmp_Domain."\n";
-        close $Fileout;
-    } else {
-        metaprint 'Warn', "Suspicious: The output of the processing is empty!";
+    if ( $database->{'For'} =~/Bind/ ) {
+        $Blacklist_tmp_Domain = '';
+        foreach my $file_to_process ( @$to_extract_for_bind ) {
+            $Blacklist_tmp_Domain .= Bind_Dump_to_disk ( $database, $file_to_process );
+            $Blacklist_tmp_Domain .= "\n";
+
+            my $nb_of_lines = $Blacklist_tmp_Domain =~ tr/\n//;
+            metaprint 'info', "Cummulative number of lines for this Blacklist in '$file_to_process' is '$nb_of_lines'";
+        }
+
+        if ( $Blacklist_tmp_Domain !~/^\s*$/ ) {
+            open ( $Fileout, ">>$Blacklist_tmp_file" );
+            print $Fileout $Blacklist_tmp_Domain."\n";
+            close $Fileout;
+        } else {
+            metaprint 'Warn', "Suspicious: The output of the processing is empty!";
+        }
+    }
+    if ( $database->{'For'} =~/Squid/ ) {
+
+        my $squid_dir = $Temp_Path . '/cleanify/' . $database->{'Category'};
+        metaprint 'info', "SquidGuard DB dir is $squid_dir" if $verbose;
+        Check_Directory ( $squid_dir );
+
+        foreach my $file_to_process ( @$to_extract_for_squid ) {
+            my $outfile = '';
+            if ( ( $file_to_process =~ /\/urls$/ ) || ( $file_to_process =~ /\/domains$/ ) ) {
+
+                # simply copy them to the right place
+                my $ext_path = dirname( $file_to_process );
+                my $title = $database->{'Title'};
+                $ext_path =~s/^.*$title\///g;
+                $outfile = "$squid_dir/$ext_path/".basename ( $file_to_process );
+                Check_Directory ( "$squid_dir/$ext_path" );
+                system("cp $file_to_process $outfile");
+                if ( $file_to_process =~ /\/domains$/ ) {
+                    $squid_cat_to_generate->{ $database->{'Category'} ."/". $ext_path }{'domainlist'} = $database->{'Category'}."/$ext_path/domains";
+                } else {
+                    $squid_cat_to_generate->{ $database->{'Category'} ."/". $ext_path }{'urllist'} = $database->{'Category'}."/$ext_path/urls";
+                }
+
+            } else {
+
+                # hum... using Type to dump the file at the right place
+                if ( (!defined($database->{'Type'}) ) || ( $database->{'Type'} =~ /^\s*$/ ) ) {
+                    metaprint 'critic', "The database type is not defined for ".$database->{'Title'}.". Skipping...";
+                    next;
+                }
+
+                $outfile = $squid_dir."/".$database->{'Type'};
+                if ( $database->{'Type'} eq 'adblock-expressions' ) {
+                    $outfile = $squid_dir."/expressions";
+                }
+
+                # TODO: Check if file exist... it should not!
+
+                my $cmd = '';
+                my $output = '';
+                if ( $database->{'Type'} eq 'urls' ) {
+                    $cmd = "cat $file_to_process > $outfile ";
+                    $output = `$cmd`;
+                    $squid_cat_to_generate->{ $database->{'Category'} }{'urllist'} = $database->{'Category'}."/urls";
+
+                } elsif ( $database->{'Type'} eq 'domains' ) {
+                    $cmd = "grep -v '^localhost\$' $file_to_process | grep -v -e '^\$' | tr [A-Z] [a-z] | awk -F. '{ print NF,\$ARGIND }' | sort -n | awk '{ print \$2 }' | uniq > $outfile ";
+                    $output = `$cmd`;
+                    $squid_cat_to_generate->{ $database->{'Category'} }{'domainlist'} = $database->{'Category'}."/domains";
+
+                } elsif ( $database->{'Type'} eq 'expressions' ) {
+                    $cmd = "cat $file_to_process > $outfile ";
+                    $output = `$cmd`;
+                    $squid_cat_to_generate->{ $database->{'Category'} }{'expressionlist'} = $database->{'Category'}."/expressions";
+                } elsif ( $database->{'Type'} eq 'adblock-expressions' ) {
+
+              # https://bugs.launchpad.net/ubuntu/+source/squidguard/+bug/316816
+                    $cmd = "sed -e '/@@.*/d' -e '/^!.*/d' -e '/^\\\[.*\\\]\$/d' -e 's#http://#^#g' -e 's,[.?=&/|()[],\\\\&,g' -e 's#*#.*#g' -e 's,\\\$.*\$,,g' -e 's/^-/\\\\-/' -e 's/^\+/\\\\+/' $file_to_process > $outfile";
+
+#A crude removal of the lines:
+# /.*\\9.*/d;
+# or just escaping (a little more future proof as far as back-references are concerned)
+# s/\\\([0-9]\)/\\\\\1/g;
+                    $output = `$cmd`;
+                    $squid_cat_to_generate->{ $database->{'Category'} }{'expressionlist'} = $database->{'Category'}."/expressions";
+                }
+                if ($verbose) {
+                    metaprint 'info', "cmd:$cmd";
+                    metaprint 'info', "output:$output";
+                }
+            }
+        }
     }
 }
 
+print "=============\n\n";
+
 metaprint 'info', "MASTER processing...";
+
+=head1
+
+Now generating the Master bind blocking list
+
+=cut
 
 #IPv4=^((25[0-5]|2[0-4][0-9]|[01]?[0-9]?[0-9])\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9]?[0-9])$
 #IPV6='(^([0-9A-Fa-f]{1,4}:){7}([0-9A-Fa-f]{1,4}){1})|::'
@@ -630,9 +837,6 @@ metaprint 'info', "MASTER processing...";
 
 metaprint 'info', "generating Bind_Blacklist_tmp_Domain";
 my $Bind_Blacklist_tmp_Domain = `grep -v '^localhost\$' $Blacklist_tmp_file | grep -v -e '^\$' | tr [A-Z] [a-z] | awk -F. '{ print NF,\$ARGIND }' | sort -n | awk '{ print \$2 }' | uniq | egrep -v "^((25[0-5]|2[0-4][0-9]|[01]?[0-9]?[0-9])\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9]?[0-9])\$" `;
-
-metaprint 'info', "generating Blacklist_tmp_Domain";
-$Blacklist_tmp_Domain = `grep -v '^localhost\$' $Blacklist_tmp_file | grep -v -e '^\$' | tr [A-Z] [a-z] | awk -F. '{ print NF,\$ARGIND }' | sort -n | awk '{ print \$2 }' | uniq `;
 
 # print Dumper $Blacklist_tmp_Domain;
 
@@ -644,7 +848,7 @@ $Blacklist_Domain = generate_tree ( $Blacklist_Domain, $Bind_Blacklist_tmp_Domai
 # print Dumper ( $Blacklist_Domain );
 
 open ( $Fileout, ">$Bind_zone_new");
-generate_file ( $Blacklist_Domain, '', $Fileout, 0 );
+generate_bind_zone_file ( $Blacklist_Domain, '', $Fileout, 0 );
 close $Fileout;
 
 ## -- Move tmp file to real one
@@ -682,5 +886,62 @@ generate_block_file ( $Bind_block_file );
 
 # end of BIND process.
 
-exit 0;
+=head1
 
+Now generating the SquidGuard blocking list
+
+=cut
+
+# print Dumper ( $squid_cat_to_generate );
+
+open ( $Fileout, ">$SquidGuard_conf_file");
+
+print $Fileout "#
+# CONFIG FILE FOR SQUIDGUARD
+#
+# Caution: do NOT use comments inside { }
+#
+
+dbhome $SquidGuard_db_Env
+logdir /var/log/squid
+
+#
+# DESTINATION CLASSES:
+#
+
+";
+
+foreach my $cat (keys %$squid_cat_to_generate ) {
+    my $tcat = $cat;
+    $tcat =~s/\.//g;
+    $tcat =~s/\///g;
+    print $Fileout "dest $tcat {\n";
+    foreach my $type ( keys %{$squid_cat_to_generate->{$cat}} ) {
+        print $Fileout "  $type " . $squid_cat_to_generate->{$cat}{$type} . "\n";
+    }
+    print $Fileout "}\n";
+    print $Fileout "\n";
+}
+
+print $Fileout "#
+# ACL RULES:
+#
+";
+
+print $Fileout "acl {\n";
+print $Fileout "  default {\n";
+print $Fileout "    pass   ";
+foreach my $cat (sort keys %$squid_cat_to_generate ) {
+    my $tcat = $cat;
+    $tcat =~s/\.//g;
+    $tcat =~s/\///g;
+    print $Fileout "!$tcat ";
+}
+print $Fileout "all\n";
+print $Fileout "    redirect http://127.0.0.1/block.html\n";
+print $Fileout "  }\n";
+print $Fileout "}\n";
+
+close ($Fileout);
+
+exit 0;
