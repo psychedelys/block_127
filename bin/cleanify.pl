@@ -935,6 +935,7 @@ foreach my $cat (sort keys %$squid_cat_to_generate ) {
     my $tcat = $cat;
     $tcat =~s/\.//g;
     $tcat =~s/\///g;
+    next if ( $tcat eq 'adblockeasylist' );
     print $Fileout "!$tcat ";
 }
 print $Fileout "all\n";
