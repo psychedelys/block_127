@@ -802,12 +802,8 @@ foreach my $database ( @{$databases} ) {
                 } elsif ( $database->{'Type'} eq 'adblock-expressions' ) {
 
               # https://bugs.launchpad.net/ubuntu/+source/squidguard/+bug/316816
-                    $cmd = "sed -e '/@@.*/d' -e '/^!.*/d' -e '/^\\\[.*\\\]\$/d' -e 's#http://#^#g' -e 's,[.?=&/|()[],\\\\&,g' -e 's#*#.*#g' -e 's,\\\$.*\$,,g' -e 's/^-/\\\\-/' -e 's/^\+/\\\\+/' -e '/^\\\.\\\*\$/d' $file_to_process > $outfile";
+                    $cmd = "sed -e '/@@.*/d' -e '/^!.*/d' -e '/^\\\[.*\\\]\$/d' -e 's#http://#^#g' -e 's,[.?=&/|()[],\\\\&,g' -e 's#*#.*#g' -e 's,\\\$.*\$,,g' -e 's/^-/\\\\-/' -e 's/^\+/\\\\+/' -e '/^\\\.\\\*\$/d' -e 's/\\\\\\([0-9]\\)/\\\\\\\\\\1/g' $file_to_process > $outfile";
 
-#A crude removal of the lines:
-# /.*\\9.*/d;
-# or just escaping (a little more future proof as far as back-references are concerned)
-# s/\\\([0-9]\)/\\\\\1/g;
                     $output = `$cmd`;
                     $squid_cat_to_generate->{ $database->{'Category'} }{'expressionlist'} = $database->{'Category'}."/expressions";
                 }
@@ -935,7 +931,6 @@ foreach my $cat (sort keys %$squid_cat_to_generate ) {
     my $tcat = $cat;
     $tcat =~s/\.//g;
     $tcat =~s/\///g;
-    next if ( $tcat eq 'adblockeasylist' );
     print $Fileout "!$tcat ";
 }
 print $Fileout "all\n";
