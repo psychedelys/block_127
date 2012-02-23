@@ -6,28 +6,54 @@ http://github.com/psychedelys/block_127
 
 Generate few rules for Bind, SquidGuard, Shorewall to automatically discard all traffics comming from those source:
 
-The script download few blacklists available and merge them into a master blacklist. Blacklist containing severals sections are just used for some category.
+The script download few blacklists available and merge them into a master blacklist. Blacklist containing severals sections are just used for some categories. The injection mechanism is not differential. It's generating the configuration files completely.
 
-*Bind:
+The supported Blacklist format are fow now:
+ * Host files.
+ * Domain list.
+ * Ad-words list.
+ * SquidGuard Blacklist.
+
+
+*** Bind:
 
 Local cache server is answering 127.0.0.1 to all selected blacklist domains. Possibility is also to redirect all traffic to a local IP hosting an inetsim (inetsim.org) to log all the traffic.
 Supported format: 
   ** IP and Domain list in hostfile format.
 
 
-* SquidGuard:
+*** SquidGuard:
 
-SquidGuard used with a Squid below. All bad URL and IP from master blacklist are injected inside. The injection mechanism is for now not differential.
+SquidGuard used with a Squid below. All bad URL, IP, expressions from master blacklist are injected inside.
 Supported format: 
   ** IP and Domain as used for Bind blacklist.
   ** Standart squidguard black list.
   ** Adblockplus black list.
 
 
-* Shorewall (in progress):
+*** Shorewall (in progress):
 
 Simply also add the list to the DROP shorewall blacklist. Be carrefull that this can be really be huged and slow down the connection. Furthermore this should not be considerate as really safe, as some DNS malware are using some well-known IP during most of the time and swap to a dirty IP for a short time period.
 
 
 ####
 Alternative format can be added easily, drop-me a request enhancement on the git dash board ;-)
+
+####
+
+The full process is planned to be totally desynchronised.
+The first process is generating the configuration files and storing the temp files in the resources directory.
+If you launched severals time per day the scripts the result will be exactly the same, as all files downloaded are cached locally for 24h! And most backlist are not updated every few seconds... So do not stress.
+
+
+hg clone https://github.com/psychedelys/block_127.git
+cd block_127
+EDIT ini/global.ini
+READ the source code, well up-to-you...
+     You want at least to check the Databases used inside bin/cleanify.pl.
+bin/cleanify.pl
+[...Processing...]
+
+Deploy the configuration is up-to you. According to your setup, and the number of front-end for your load. Everything is differents in each case from deploy localy to deploy on a cluster. But for each time, you just want to generate the file once. The exact methods are from cp to the rsync going though the web services or the BitTorrent protocol (http://engineering.twitter.com/2010/07/murder-fast-datacenter-code-deploys.html)
+So the deploy_dns and deploy_squidguard are mostly here as example, write your own ;-)
+
