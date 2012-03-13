@@ -111,7 +111,7 @@ sub db_val_load ($$$)
     if ( $dbcfg->exists($title, $val) ) {
         return $dbcfg->val($title, $val);
     } else {
-        print "section '$title' value '$val' not found.\n" if ($val !~/^(Extract_Category|MD5|Type)$/);
+        print "section '$title' value '$val' not found.\n" if ($val !~/^(Extract_Category|Tar_Prefix|MD5|Type)$/);
         return -1;
     }
 }
@@ -125,7 +125,6 @@ foreach my $db ( $dbcfg->Sections() ) {
             print "loading parameter for database $db.\n";
             $tmp->{'Activ'} = 1;
         } else {
-            print "skipping database $db.\n";
             next;
         }
     } else {
@@ -171,6 +170,12 @@ foreach my $db ( $dbcfg->Sections() ) {
     $temp = db_val_load( $dbcfg, $db, 'Extract_Category' );
     if ( defined($temp) && ( $temp !~ /^\s*$/ ) ) {
         $tmp->{'Extract_Category'} = $temp;
+    }
+
+    # Tar_Prefix
+    $temp = db_val_load( $dbcfg, $db, 'Tar_Prefix' );
+    if ( defined($temp) && ( $temp !~ /^\s*$/ ) ) {
+        $tmp->{'Tar_Prefix'} = $temp;
     }
 
     # Type
@@ -641,7 +646,7 @@ foreach my $database ( @{$databases} ) {
         # BL/category/domains or BL/category/urls
         foreach my $file ( @$tar_files ) {
             foreach my $ext ( @$tar_ext ) {
-                if ( ( $file eq 'BL/'.$ext.'/domains' ) || ( $file eq 'blacklists/'.$ext.'/domains' ) )  {
+                if ( $file eq $database->{'Tar_Prefix'}.'/'.$ext.'/domains' ) {
                     Check_Directory ( $Temp_Path . '/' . $database->{'Title'} . '/' . $ext );
                     $tar->extract_file( $file, $Temp_Path . '/' . $database->{'Title'} . '/' . $ext . '/domains' );
                     if ( $database->{'For'} =~/Bind/ ) {
@@ -651,7 +656,7 @@ foreach my $database ( @{$databases} ) {
                         push ( @$to_extract_for_squid, $Temp_Path . '/' . $database->{'Title'} . '/' . $ext . '/domains' );
                     }
 
-                } elsif ( ( $file eq 'BL/'.$ext.'/urls' ) || ( $file eq 'blacklists/'.$ext.'/urls' ) ) {
+                } elsif ( $file eq $database->{'Tar_Prefix'}.'/'.$ext.'/urls' ) {
                     Check_Directory ( $Temp_Path . '/' . $database->{'Title'} . '/' . $ext );
                     $tar->extract_file( $file, $Temp_Path . '/' . $database->{'Title'} . '/' . $ext . '/urls' );
                     if ( $database->{'For'} =~/Squid/ ) {
