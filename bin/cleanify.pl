@@ -92,140 +92,133 @@ my $databases = [];
 
 =head1
 
-  To be moved to an iniFile
+  Load the ini file with the Database to be used.
 
 =cut
 
-push ( @{$databases}, {
-        Title => 'winhelp2002',
-        Activ => 1,
-        URL => 'http://winhelp2002.mvps.org/hosts.txt',
+my $dbf = "$abs_path/../ini/database.ini";
+if ( ( !-f $dbf ) &&  ( !-r $dbf ) ) {
+    metaprint 'critic', "The db file is not found or not readable, aborting.";
+    exit 1;
+}
 
-        # MD5: http://winhelp2002.mvps.org/hosts.htm
-        # Timestamp: http://winhelp2002.mvps.org/hosts.htm
-        Category => 'winhelp2002',
-        Type => 'domains',
-        Script => 'v1',
-        For => 'Bind,Squid,Shorewall',
-        Local => "$Temp_Path/hosts1.txt",
-    });
+print "dbf file at '$dbf'\n";
+my $dbcfg = Config::IniFiles->new( -file => $dbf );
 
-push ( @{$databases}, {
-        Title => 'malwaredomains',
-        Activ => 1,
-        URL => 'http://mirror1.malwaredomains.com/files/justdomains',
-        TimeStamp => 'http://mirror1.malwaredomains.com/files/timestamp',
-        MD5 => 'http://mirror1.malwaredomains.com/files/md5',
-        Category => 'MalwareDomains',
-        Type => 'domains',
-        Script => 'v1',
-        For => 'Bind,Squid,Shorewall',
-        Local => "$Temp_Path/hosts2.txt",
-    });
+sub db_val_load ($$$)
+{
+    my ( $dbcfg, $title, $val ) = @_;
+    if ( $dbcfg->exists($title, $val) ) {
+        return $dbcfg->val($title, $val);
+    } else {
+        print "section '$title' value '$val' not found.\n" if ($val !~/^(Extract_Category|MD5|Type)$/);
+        return -1;
+    }
+}
 
-push ( @{$databases}, {
-        Title => 'spyeye',
-        Activ => 1,
-        URL => 'http://www.abuse.ch/spyeyetracker/blocklist.php?download=domainblocklist',
-        Category => 'Abuse.ch/SpyEye',
-        Type => 'domains',
-        Script => 'v1',
-        For => 'Bind,Squid,Shorewall',
-        Local => "$Temp_Path/hosts3.txt",
-    });
+foreach my $db ( $dbcfg->Sections() ) {
+    my $tmp = ();
 
-push ( @{$databases}, {
-        Title => 'zeus',
-        Activ => 1,
-        URL => 'http://www.abuse.ch/zeustracker/blocklist.php?download=domainblocklist',
-        Type => 'domains',
-        Category => 'Abuse.ch/Zeus',
-        Script => 'v1',
-        For => 'Bind,Squid,Shorewall',
-        Local => "$Temp_Path/hosts4.txt",
-    });
+    # Activ
+    if ( $dbcfg->exists($db, 'Activ') ) {
+        if ( $dbcfg->val($db, 'Activ') ) {
+            print "loading parameter for database $db.\n";
+            $tmp->{'Activ'} = 1;
+        } else {
+            print "skipping database $db.\n";
+            next;
+        }
+    } else {
+        print "skipping loading of database $db, value 'Activ' not found.\n";
+        next;
+    }
 
-push ( @{$databases}, {
-        Title => 'amada',
-        Activ => 1,
-        URL => 'http://amada.abuse.ch/blocklist.php?download=domainblocklist',
-        Category => 'Abuse.ch/Amada',
-        Type => 'domains',
-        Script => 'v1',
-        For => 'Bind,Squid,Shorewall',
-        Local => "$Temp_Path/hosts5.txt",
-    });
+    $tmp->{'Title'} = $db;
 
-push ( @{$databases}, {
-        Title => 'shallalist',
-        Activ => 1,
-        URL => 'http://www.shallalist.de/Downloads/shallalist.tar.gz',
-        MD5 => 'http://www.shallalist.de/Downloads/shallalist.tar.gz.md5',
-        Category => 'Shallalist',
-        Extract_Category => 'adv,aggressive,anonvpn,costtraps,remotecontrol,spyware,tracker',
-        Script => 'v1',
-        For => 'Bind,Squid,Shorewall',
-        Local => "$Temp_Path/shallalist.tar.gz",
-    });
+    # URL
+    my $temp = db_val_load( $dbcfg, $db, 'URL' );
+    if ( $temp =~ /^-1$/ ) {
+        metaprint 'critic', "Val of 'URL' not found, skipping.";
+        next;
+    }
+    if ( defined($temp) && ( $temp !~ /^\s*$/ ) ) {
+        $tmp->{'URL'} = $temp;
+    } else {
+        metaprint 'critic', "Val of 'URL' not conform, , skipping.";
+        next;
+    }
 
-push ( @{$databases}, {
-        Title => 'EasyList',
-        Activ => 1,
-        URL => 'https://easylist-downloads.adblockplus.org/easylist.txt',
-        Category => 'adblock/EasyList',
-        Type => 'adblock-expressions',
-        Script => '',
-        For => 'Squid',
-        Local => "$Temp_Path/pattern1.txt",
-    });
+    # MD5
+    $temp = db_val_load( $dbcfg, $db, 'MD5' );
+    if ( defined($temp) && ( $temp !~ /^\s*$/ ) ) {
+        $tmp->{'MD5'} = $temp;
+    }
 
-push ( @{$databases}, {
-        Title => 'EasyPrivacy',
-        Activ => 1,
-        URL => 'https://easylist-downloads.adblockplus.org/easyprivacy.txt',
-        Category => 'adblock/EasyPrivacy',
-        Type => 'adblock-expressions',
-        Script => '',
-        For => 'Squid',
-        Local => "$Temp_Path/pattern2.txt",
-    });
+    # Category
+    $temp = db_val_load( $dbcfg, $db, 'Category' );
+    if ( $temp =~ /^-1$/ ) {
+        metaprint 'critic', "Val of 'Category' not found, skipping.";
+        next;
+    }
+    if ( defined($temp) && ( $temp !~ /^\s*$/ ) ) {
+        $tmp->{'Category'} = $temp;
+    } else {
+        metaprint 'critic', "Val of 'Category' not conform, , skipping.";
+        next;
+    }
 
-push ( @{$databases}, {
-        Title => 'adversity-general',
-        Activ => 1,
-        URL => 'https://adversity.googlecode.com/hg/Adversity.txt',
-        Category => 'adversity/general',
-        Type => 'adblock-expressions',
-        Script => '',
-        For => 'Squid',
-        Local => "$Temp_Path/pattern3.txt",
-    });
+    # Extract_Category
+    $temp = db_val_load( $dbcfg, $db, 'Extract_Category' );
+    if ( defined($temp) && ( $temp !~ /^\s*$/ ) ) {
+        $tmp->{'Extract_Category'} = $temp;
+    }
 
-push ( @{$databases}, {
-        Title => 'adversity-antisocial',
-        Activ => 1,
-        URL => 'https://adversity.googlecode.com/hg/Antisocial.txt',
-        Category => 'adversity/antisocial',
-        Type => 'adblock-expressions',
-        Script => '',
-        For => 'Squid',
-        Local => "$Temp_Path/pattern4.txt",
-    });
+    # Type
+    $temp = db_val_load( $dbcfg, $db, 'Type' );
+    if ( defined($temp) && ( $temp !~ /^\s*$/ ) ) {
+        $tmp->{'Type'} = $temp;
+    }
 
-push ( @{$databases}, {
-        Title => 'adversity-antisocial',
-        Activ => 1,
-        URL => 'https://adversity.googlecode.com/hg/Extreme-Measures.txt',
-        Category => 'adversity/extreme',
-        Type => 'adblock-expressions',
-        Script => '',
-        For => 'Squid',
-        Local => "$Temp_Path/pattern5.txt",
-    });
+    # Script
+    $temp = db_val_load( $dbcfg, $db, 'Script' );
+    if ( $temp =~ /^-1$/ ) {
+        metaprint 'critic', "Val of 'Script' not found, skipping.";
+        next;
+    }
+    if ( defined($temp) && ( $temp !~ /^\s*$/ ) ) {
+        $tmp->{'Script'} = $temp;
+    } else {
+        $tmp->{'Script'} = '';
+    }
 
-# http://squidguard.mesd.k12.or.us/blacklists.tgz
-# http://cri.univ-tlse1.fr/documentations/cache/squidguard_en.html#contrib
-# http://urlblacklist.com/?sec=download
+    # For
+    $temp = db_val_load( $dbcfg, $db, 'For' );
+    if ( $temp =~ /^-1$/ ) {
+        metaprint 'critic', "Val of 'For' not found, skipping.";
+        next;
+    }
+    if ( defined($temp) && ( $temp !~ /^\s*$/ ) ) {
+        $tmp->{'For'} = $temp;
+    } else {
+        metaprint 'critic', "Val of 'For' not conform, , skipping.";
+        next;
+    }
+
+    # Local
+    $temp = db_val_load( $dbcfg, $db, 'Local' );
+    if ( $temp =~ /^-1$/ ) {
+        metaprint 'critic', "Val of 'Local' not found, skipping.";
+        next;
+    }
+    if ( defined($temp) && ( $temp !~ /^\s*$/ ) ) {
+        $tmp->{'Local'} = $Temp_Path . "/" . $temp;
+    } else {
+        metaprint 'critic', "Val of 'Local' not conform, , skipping.";
+        next;
+    }
+
+    push ( @{$databases}, $tmp );
+}
 
 =head1 
 
@@ -510,7 +503,6 @@ my $fromcache = 0;
 Initialisation of the Web Content fetcher
 =cut
 
-# TODO: move user-agent to header...
 my $ua = LWP::UserAgent->new(agent => $user_agent);
 if ( defined($http_proxy) && ( $http_proxy !~ /^\s*$/ ) ) {
     $ua->proxy('http', $http_proxy );
