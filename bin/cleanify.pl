@@ -190,38 +190,15 @@ push ( @{$databases}, {
         Local => "$Temp_Path/pattern2.txt",
     });
 
-
 push ( @{$databases}, {
-        Title => 'adversity-tracking',
+        Title => 'adversity-general',
         Activ => 1,
-        URL => 'https://adversity.googlecode.com/hg/Adversity-Tracking.txt',
-        Category => 'adversity/Tracking',
+        URL => 'https://adversity.googlecode.com/hg/Adversity.txt',
+        Category => 'adversity/general',
         Type => 'adblock-expressions',
         Script => '',
         For => 'Squid',
         Local => "$Temp_Path/pattern3.txt",
-    });
-
-push ( @{$databases}, {
-        Title => 'adversity-adult',
-        Activ => 1,
-        URL => 'https://adversity.googlecode.com/hg/Adversity-Adult.txt',
-        Category => 'adversity/adult',
-        Type => 'adblock-expressions',
-        Script => '',
-        For => 'Squid',
-        Local => "$Temp_Path/pattern4.txt",
-    });
-
-push ( @{$databases}, {
-        Title => 'adversity-p2p',
-        Activ => 1,
-        URL => 'https://adversity.googlecode.com/hg/Adversity-p2p.txt',
-        Category => 'adversity/p2p',
-        Type => 'adblock-expressions',
-        Script => '',
-        For => 'Squid',
-        Local => "$Temp_Path/pattern5.txt",
     });
 
 push ( @{$databases}, {
@@ -232,15 +209,23 @@ push ( @{$databases}, {
         Type => 'adblock-expressions',
         Script => '',
         For => 'Squid',
-        Local => "$Temp_Path/pattern6.txt",
+        Local => "$Temp_Path/pattern4.txt",
     });
 
+push ( @{$databases}, {
+        Title => 'adversity-antisocial',
+        Activ => 1,
+        URL => 'https://adversity.googlecode.com/hg/Extreme-Measures.txt',
+        Category => 'adversity/extreme',
+        Type => 'adblock-expressions',
+        Script => '',
+        For => 'Squid',
+        Local => "$Temp_Path/pattern5.txt",
+    });
 
-
+# http://squidguard.mesd.k12.or.us/blacklists.tgz
 # http://cri.univ-tlse1.fr/documentations/cache/squidguard_en.html#contrib
-# http://doc.pfsense.org/index.php/SquidGuard_package
-# Websense - download.websense.com
-# SmartFilter - list.smartfilter.com
+# http://urlblacklist.com/?sec=download
 
 =head1 
 
