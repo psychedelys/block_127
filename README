@@ -4,7 +4,7 @@ Copyright (C) 2012 Psychedelys <psychedelys@gmail.com>
 http://github.com/psychedelys/block_127
 
 
-Generate few rules for Bind, SquidGuard, Shorewall to automatically discard all traffics comming from those source:
+Generate few rules for Bind, SquidGuard, Shorewall to automatically discard all traffics comming/outgoing from/to those sources:
 
 The script download few blacklists available and merge them into a master blacklist. Blacklist containing severals sections are just used for some categories. The injection mechanism is not differential. It's generating the configuration files completely.
 
@@ -49,11 +49,12 @@ If you launched severals time per day the scripts the result will be exactly the
 hg clone https://github.com/psychedelys/block_127.git
 cd block_127
 EDIT ini/global.ini
+CHECK ini/database.ini
 READ the source code, well up-to-you...
-     You want at least to check the Databases used inside bin/cleanify.pl.
 bin/cleanify.pl
 [...Processing...]
 
 Deploy the configuration is up-to you. According to your setup, and the number of front-end for your load. Everything is differents in each case from deploy localy to deploy on a cluster. But for each time, you just want to generate the file once. The exact methods are from cp to the rsync going though the web services or the BitTorrent protocol (http://engineering.twitter.com/2010/07/murder-fast-datacenter-code-deploys.html)
 So the deploy_dns and deploy_squidguard are mostly here as example, write your own ;-)
 
+And have fun...
