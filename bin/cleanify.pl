@@ -577,7 +577,11 @@ foreach my $database ( @{$databases} ) {
                         $content_md5 =~s/\s.*$//g;
                         last;
                     }
+                } elsif ( $l =~ /^"\d{4}-\d{2}-\d{2}","([0-9a-f]+)","\d+"$/ ) {
+                    $content_md5 = $1;
+                    last;
                 }
+
             }
 
             # checking the MD5
