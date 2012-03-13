@@ -45,7 +45,17 @@ BIND_PATH=${bind_path}
 echo "TMP_PATH is ${TMP_PATH}"
 echo "BIND_PATH is ${BIND_PATH}"
 
-BIND_OPT=`grep OPTIONS /etc/default/bind9 | sed -e 's/^.*=//' -e 's/\"//g'`
+if [ -f /etc/default/bind9 ]; then
+  BIND_OPT=`grep OPTIONS /etc/default/bind9 | sed -e 's/^.*=//' -e 's/\"//g'`
+fi
+if [ ! -z '${BIND_OPT}' ]; then
+  CHROOT=`echo ${BIND_OPT} | awk '{FS=" "; for( i = 0; i <= NF; i++ ) if( $i == "-t" ) { printf( "%s", $(i+1) ) }; }' `
+fi
+if [ ! -z ${CHROOT} ]; then
+  echo "Bind chroot have been detected under '${CHROOT}'"
+else
+  echo "No Bind chroot detected"
+fi
 
 if [ ! -d ${BIND_PATH} ]; then
   echo "BIND path ${BIND_PATH} is not found, aborting"
@@ -70,6 +80,11 @@ else
 fi
 
 echo "Checking named.conf file :"
+checkout_cmd="/usr/sbin/named-checkconf -z "
+if [ ! -z ${CHROOT} ]; then
+   checkout_cmd=${checkout_cmd}" -t ${CHROOT}"
+fi
+checkout_cmd=${checkout_cmd}" ${BIND_PATH}/named.conf 2>&1 > /dev/null"
 CheckOUT=`/usr/sbin/named-checkconf -z ${BIND_PATH}/named.conf 2>&1 > /dev/null`
 CheckRTN=$?
 
