@@ -136,7 +136,7 @@ foreach my $db ( $dbcfg->Sections() ) {
 
     # URL
     my $temp = db_val_load( $dbcfg, $db, 'URL' );
-    if ( $temp =~ /^-1$/ ) {
+    if ( defined($temp) && ( $temp =~ /^-1$/ ) ) {
         metaprint 'critic', "Val of 'URL' not found, skipping.";
         next;
     }
@@ -149,13 +149,13 @@ foreach my $db ( $dbcfg->Sections() ) {
 
     # MD5
     $temp = db_val_load( $dbcfg, $db, 'MD5' );
-    if ( defined($temp) && ( $temp !~ /^\s*$/ ) ) {
+    if ( defined($temp) && ( $temp !~ /^\s*$/ ) && ( $temp !~ /^-1$/ ) ) {
         $tmp->{'MD5'} = $temp;
     }
 
     # Category
     $temp = db_val_load( $dbcfg, $db, 'Category' );
-    if ( $temp =~ /^-1$/ ) {
+    if ( defined($temp) && ( $temp =~ /^-1$/ ) ) {
         metaprint 'critic', "Val of 'Category' not found, skipping.";
         next;
     }
@@ -168,25 +168,25 @@ foreach my $db ( $dbcfg->Sections() ) {
 
     # Extract_Category
     $temp = db_val_load( $dbcfg, $db, 'Extract_Category' );
-    if ( defined($temp) && ( $temp !~ /^\s*$/ ) ) {
+    if ( defined($temp) && ( $temp !~ /^\s*$/ ) && ( $temp !~ /^-1$/ ) ) {
         $tmp->{'Extract_Category'} = $temp;
     }
 
     # Tar_Prefix
     $temp = db_val_load( $dbcfg, $db, 'Tar_Prefix' );
-    if ( defined($temp) && ( $temp !~ /^\s*$/ ) ) {
+    if ( defined($temp) && ( $temp !~ /^\s*$/ ) && ( $temp !~ /^-1$/ ) ) {
         $tmp->{'Tar_Prefix'} = $temp;
     }
 
     # Type
     $temp = db_val_load( $dbcfg, $db, 'Type' );
-    if ( defined($temp) && ( $temp !~ /^\s*$/ ) ) {
+    if ( defined($temp) && ( $temp !~ /^\s*$/ ) && ( $temp !~ /^-1$/ ) ) {
         $tmp->{'Type'} = $temp;
     }
 
     # Script
     $temp = db_val_load( $dbcfg, $db, 'Script' );
-    if ( $temp =~ /^-1$/ ) {
+    if ( defined($temp) && ( $temp =~ /^-1$/ ) ) {
         metaprint 'critic', "Val of 'Script' not found, skipping.";
         next;
     }
@@ -198,7 +198,7 @@ foreach my $db ( $dbcfg->Sections() ) {
 
     # For
     $temp = db_val_load( $dbcfg, $db, 'For' );
-    if ( $temp =~ /^-1$/ ) {
+    if ( defined($temp) && ( $temp =~ /^-1$/ ) ) {
         metaprint 'critic', "Val of 'For' not found, skipping.";
         next;
     }
@@ -211,7 +211,7 @@ foreach my $db ( $dbcfg->Sections() ) {
 
     # Local
     $temp = db_val_load( $dbcfg, $db, 'Local' );
-    if ( $temp =~ /^-1$/ ) {
+    if ( defined($temp) && ( $temp =~ /^-1$/ ) ) {
         metaprint 'critic', "Val of 'Local' not found, skipping.";
         next;
     }
@@ -224,6 +224,8 @@ foreach my $db ( $dbcfg->Sections() ) {
 
     push ( @{$databases}, $tmp );
 }
+
+print Dumper ( @{$databases} ) if $debug;
 
 =head1 
 
