@@ -15,7 +15,7 @@ The supported Blacklist format are fow now:
  * SquidGuard Blacklist.
 
 
-*** Bind:
+*** Bind / PowerDNS:
 
 Local cache server is answering 127.0.0.1 to all selected blacklist domains. Possibility is also to redirect all traffic to a local IP hosting an inetsim (inetsim.org) to log all the traffic.
 Supported format: 
@@ -58,3 +58,22 @@ Deploy the configuration is up-to you. According to your setup, and the number o
 So the deploy_dns and deploy_squidguard are mostly here as example, write your own ;-)
 
 And have fun...
+
+####
+
+DNS quick facts (Benchmark):
+
+
+Bind 
+----
+Reload time -> 3 min
+Memory Size -> 1.1 GB
+
+
+PowerDNS
+--------
+injection time -> very very long (>12h)... Some more work need to be done here.
+Reload time -> < 10s
+Memory Size -> 7 MB
+
+
