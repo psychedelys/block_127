@@ -464,6 +464,9 @@ sub Bind_Dump_to_disk ($$)
     } elsif ( $database->{'Script'} eq 'v1' ) {
         my $cmd = "grep -v '^#' $file | grep -v -e '^\$' | grep -v '^localhost\$' | awk -F. '{ print NF,\$ARGIND }' | sort -n | awk '{ print \$2 }' | uniq";
         $Blacklist_tmp_Domain = `$cmd`;
+    } elsif ( $database->{'Script'} eq 'v2' ) {
+        my $cmd = "grep -v '^#' $file | grep -v -e '^\$' | grep -v '^localhost\$' | sed -e 's/\\\././g' -e 's/^\.//' | awk -F. '{ print NF,\$ARGIND }' | sort -n | awk '{ print \$2 }' | uniq";
+        $Blacklist_tmp_Domain = `$cmd`;
     }
     return $Blacklist_tmp_Domain;
 }
@@ -577,9 +580,11 @@ foreach my $database ( @{$databases} ) {
             foreach my $l ( split ('\n', $content_md5 ) ) {
                 chomp ( $l );
                 $l =~s/\r*//g;
-                if ( $l =~ /^([0-9a-f]+)\s+([\w\.]+)$/ ) {
-                    if ( $2 eq $md5_file ) {
-                        $content_md5 = $1;
+                if ( $l =~ /^([0-9a-f]+)\s+([\w\\:\-\.]+)$/ ) {
+                    $content_md5 = $1;
+                    my $tmp_file = basename($2);
+                    $tmp_file =~s/^.*\\//;
+                    if ( $tmp_file eq $md5_file ) {
                         $content_md5 =~s/^\s*//;
                         $content_md5 =~s/\s.*$//g;
                         last;
