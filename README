@@ -4,7 +4,7 @@ Copyright (C) 2012 Psychedelys <psychedelys@gmail.com>
 http://github.com/psychedelys/block_127
 
 
-Generate few rules for Bind, SquidGuard, Shorewall to automatically discard all traffics comming/outgoing from/to those sources:
+Generate few rules for  DNS Server (Bind, PowerDNS or ...), SquidGuard, Shorewall to automatically discard all traffics comming/outgoing from/to those sources:
 
 The script download few blacklists available and merge them into a master blacklist. Blacklist containing severals sections are just used for some categories. The injection mechanism is not differential. It's generating the configuration files completely.
 
@@ -15,7 +15,7 @@ The supported Blacklist format are fow now:
  * SquidGuard Blacklist.
 
 
-*** Bind / PowerDNS:
+*** DNS Server -Bind / PowerDNS-:
 
 Local cache server is answering 127.0.0.1 to all selected blacklist domains. Possibility is also to redirect all traffic to a local IP hosting an inetsim (inetsim.org) to log all the traffic.
 Supported format: 
@@ -26,7 +26,7 @@ Supported format:
 
 SquidGuard used with a Squid below. All bad URL, IP, expressions from master blacklist are injected inside.
 Supported format: 
-  ** IP and Domain as used for Bind blacklist.
+  ** IP and Domain as used for DNS blacklist.
   ** Standart squidguard black list.
   ** Adblockplus black list.
 
