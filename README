@@ -72,7 +72,8 @@ Memory Size -> 1.1 GB
 
 PowerDNS
 --------
-injection time -> very very long (>12h)... Some more work need to be done here.
+injection time without RAMDISK -> very very long (~23h for sqlite on my test system)... Some more work need to be done here.
+injection time with RAMDISK -> ~4min
 Reload time -> < 10s
 Memory Size -> 7 MB
 
