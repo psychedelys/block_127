@@ -28,12 +28,24 @@ use File::Spec;
 my $debug = 0;
 my $verbose = 0;
 
+sub metaprint ($$);
+sub db_val_load ($$$);
+sub load_list ($);
+sub rec1 ($$$$);
+sub generate_tree ($$$$);
+sub generate_bind_zone_file ($$$$);
+sub generate_block_file ($);
+sub Get_HTTP_File ($$$$);
+sub Bind_Dump_to_disk ($$);
+sub Check_Directory ($);
+
 sub metaprint ($$)
 {
     my ($level, $display) = @_;
 
     print time2str("%T", time()) . " - [".uc($level)."] - " . ( (caller(1))[3] ? (caller(1))[3] :'') . " - " . ( (caller(0))[2] ? 'L'.(caller(0))[2].' - ' :'') . $display . "\n";
 }
+
 
 my $abs_path = dirname( File::Spec->rel2abs($0) );
 print "Current script path is: '$abs_path'\n";
@@ -70,17 +82,51 @@ $user_agent = 'Mozilla/4.73 [en] (X11; I; Linux 2.2.16 i686; Nav)' if ( !defined
 
 my $SquidGuard_db_Env = $cfg->val( 'global', 'squid_db_path' );
 if ( !defined($SquidGuard_db_Env) || ( $SquidGuard_db_Env =~ /^\s*$/ ) ) {
-    metaprint 'critic', "The SquidGuard_db_Env is not defined.";
+    metaprint 'critic', "The SquidGuard_db_Env is not defined. So exiting!";
     exit 1;
 }
+my $ip4_redirector = $cfg->val( 'global', 'ip4_redirector' );
+if ( !defined($ip4_redirector) || ( $ip4_redirector !~ // ) ) {
+    metaprint 'critic', "The ip4_redirector values is not correct, assuming '127.0.0.1'";
+    $ip4_redirector = '127.0.0.1';
+}
+my $ip6_redirector = $cfg->val( 'global', 'ip6_redirector' );
+if ( !defined($ip6_redirector) || ( $ip6_redirector !~ // ) ) {
+    metaprint 'critic', "The ip6_redirector values is not correct, assuming '::1'";
+    $ip6_redirector = '::1';
+}
+
+my $rbldns_ip = $cfg->val( 'global', 'rbldns_ip' );
+if ( !defined($rbldns_ip) || ( $rbldns_ip !~ // ) ) {
+    metaprint 'critic', "The rbldns_ip values is not correct, no assumption, so exiting!";
+    exit 1;
+}
+
+my $ddl_path = "$Temp_Path/ddl";
+Check_Directory ( $ddl_path );
+
+my $tmp_path = "$Temp_Path/tmp";
+Check_Directory ( $tmp_path );
 
 my $Bind_zone_prod = "$Temp_Path/named.conf.block";
 my $Bind_zone_prod_old = "$Temp_Path/named.conf.block.old";
 my $Bind_zone_new = "$Temp_Path/named.conf.block.new";
 my $Bind_block_file = "$Temp_Path/blockeddomain.hosts";
+
 my $SquidGuard_conf_file = "$Temp_Path/squidGuard.conf";
 
-my $Blacklist_tmp_file = "$Temp_Path/result";
+my $Rbldns_conf_file_prod = "$Temp_Path/rbldns_bad_guys";
+my $Rbldns_conf_file_old  = "$Temp_Path/rbldns_bad_guys.old";
+my $Rbldns_conf_file_new  = "$Temp_Path/rbldns_bad_guys.new";
+
+my $nginx_conf_file_prod = "$Temp_Path/nginx_blockips";
+my $nginx_conf_file_old  = "$Temp_Path/nginx_blockips.old";
+my $nginx_conf_file_new  = "$Temp_Path/nginx_blockips.new";
+
+my $Blacklist_tmp_bind_file = "$Temp_Path/result_tmp_bind";
+my $Blacklist_tmp_shorewall_file = "$Temp_Path/result_tmp_shorewall";
+my $Blacklist_tmp_rbldns_file = "$Temp_Path/result_tmp_rbldns";
+my $Blacklist_tmp_nginx_file = "$Temp_Path/result_tmp_nginx";
 
 my $white_file = "$abs_path/" . $cfg->val( 'global', 'whitelist');
 if ( ( ! -f $white_file ) &&  ( !-r $white_file ) ) {
@@ -137,13 +183,13 @@ foreach my $db ( $dbcfg->Sections() ) {
     # URL
     my $temp = db_val_load( $dbcfg, $db, 'URL' );
     if ( defined($temp) && ( $temp =~ /^-1$/ ) ) {
-        metaprint 'critic', "Val of 'URL' not found, skipping.";
+        metaprint 'critic', "Val of 'URL' for '$db' not found, skipping.";
         next;
     }
     if ( defined($temp) && ( $temp !~ /^\s*$/ ) ) {
         $tmp->{'URL'} = $temp;
     } else {
-        metaprint 'critic', "Val of 'URL' not conform, , skipping.";
+        metaprint 'critic', "Val of 'URL' for '$db' not conform, , skipping.";
         next;
     }
 
@@ -156,13 +202,13 @@ foreach my $db ( $dbcfg->Sections() ) {
     # Category
     $temp = db_val_load( $dbcfg, $db, 'Category' );
     if ( defined($temp) && ( $temp =~ /^-1$/ ) ) {
-        metaprint 'critic', "Val of 'Category' not found, skipping.";
+        metaprint 'critic', "Val of 'Category' for '$db' not found, skipping.";
         next;
     }
     if ( defined($temp) && ( $temp !~ /^\s*$/ ) ) {
         $tmp->{'Category'} = $temp;
     } else {
-        metaprint 'critic', "Val of 'Category' not conform, , skipping.";
+        metaprint 'critic', "Val of 'Category' for '$db' not conform, , skipping.";
         next;
     }
 
@@ -187,7 +233,7 @@ foreach my $db ( $dbcfg->Sections() ) {
     # Script
     $temp = db_val_load( $dbcfg, $db, 'Script' );
     if ( defined($temp) && ( $temp =~ /^-1$/ ) ) {
-        metaprint 'critic', "Val of 'Script' not found, skipping.";
+        metaprint 'critic', "Val of 'Script' for '$db' not found, skipping.";
         next;
     }
     if ( defined($temp) && ( $temp !~ /^\s*$/ ) ) {
@@ -199,26 +245,26 @@ foreach my $db ( $dbcfg->Sections() ) {
     # For
     $temp = db_val_load( $dbcfg, $db, 'For' );
     if ( defined($temp) && ( $temp =~ /^-1$/ ) ) {
-        metaprint 'critic', "Val of 'For' not found, skipping.";
+        metaprint 'critic', "Val of 'For' for '$db' not found, skipping.";
         next;
     }
     if ( defined($temp) && ( $temp !~ /^\s*$/ ) ) {
         $tmp->{'For'} = $temp;
     } else {
-        metaprint 'critic', "Val of 'For' not conform, , skipping.";
+        metaprint 'critic', "Val of 'For' for '$db' not conform, , skipping.";
         next;
     }
 
     # Local
     $temp = db_val_load( $dbcfg, $db, 'Local' );
     if ( defined($temp) && ( $temp =~ /^-1$/ ) ) {
-        metaprint 'critic', "Val of 'Local' not found, skipping.";
+        metaprint 'critic', "Val of 'Local' for '$db' not found, skipping.";
         next;
     }
     if ( defined($temp) && ( $temp !~ /^\s*$/ ) ) {
-        $tmp->{'Local'} = $Temp_Path . "/" . $temp;
+        $tmp->{'Local'} = $ddl_path . "/" . $temp;
     } else {
-        metaprint 'critic', "Val of 'Local' not conform, , skipping.";
+        metaprint 'critic', "Val of 'Local' for '$db' not conform, , skipping.";
         next;
     }
 
@@ -410,11 +456,11 @@ Writeout the BIND db file with proper content
                 86400 )     ; min ttl  1 day
 ;
 		NS   localhost.
-                A    127.0.0.1
-                AAAA ::1
+                A    $ip4_redirector
+                AAAA $ip6_redirector
 
-*               IN      A       127.0.0.1
-*               IN	AAAA	::1
+*               IN      A       $ip4_redirector
+*               IN	AAAA	$ip6_redirector
 OUT
 
     close $fileout;
@@ -467,6 +513,10 @@ sub Bind_Dump_to_disk ($$)
     } elsif ( $database->{'Script'} eq 'v2' ) {
         my $cmd = "grep -v '^#' $file | grep -v -e '^\$' | grep -v '^localhost\$' | sed -e 's/\\\././g' -e 's/^\.//' | awk -F. '{ print NF,\$ARGIND }' | sort -n | awk '{ print \$2 }' | uniq";
         $Blacklist_tmp_Domain = `$cmd`;
+    } elsif ( $database->{'Script'} eq 'v3' ) {
+	my $cmd = "grep -v '^;' $file | sed 's/ ; .*\$//g' | grep -v -e '^\$' | grep -v '^localhost\$' | grep -v '^127\.0\.0\.' ";
+        # metaprint 'info', "Running command: '$cmd'";
+        $Blacklist_tmp_Domain = `$cmd`;
     }
     return $Blacklist_tmp_Domain;
 }
@@ -493,12 +543,48 @@ sub Check_Directory ($)
 
 =cut
 
-if ( -f $Blacklist_tmp_file ) {
-    system("rm -f $Blacklist_tmp_file");
+=head2
+
+Removing the previous Bind temp file
+
+=cut
+if ( -f $Blacklist_tmp_bind_file ) {
+    system("rm -f $Blacklist_tmp_bind_file");
 }
+=head2
+
+Removing the previous Squid generating directory
+
+=cut
 if ( -d $Temp_Path . '/cleanify/' ) {
     system("rm -rf $Temp_Path/cleanify");
 }
+=head2
+
+Removing the previous Shorewall temp file
+
+=cut
+if ( -f $Blacklist_tmp_shorewall_file ) {
+    system("rm -f $Blacklist_tmp_shorewall_file");
+}
+=head2
+
+Removing the previous RBLdns temp file
+
+=cut
+if ( -f $Blacklist_tmp_rbldns_file ) {
+    system("rm -f $Blacklist_tmp_rbldns_file");
+}
+=head2
+
+Removing the previous nginx temp file
+
+=cut
+if ( -f $Blacklist_tmp_nginx_file ) {
+    system("rm -f $Blacklist_tmp_nginx_file");
+}
+
+
 
 =head2
 Loading the Whitelist
@@ -628,6 +714,9 @@ foreach my $database ( @{$databases} ) {
 
     my $to_extract_for_bind = ();
     my $to_extract_for_squid = ();
+    my $to_extract_for_shorewall = ();
+    my $to_extract_for_rbldns = ();
+    my $to_extract_for_nginx = ();
 
     if ( $database->{'Local'} =~/\.tar\.gz$/ ) {
 
@@ -648,26 +737,34 @@ foreach my $database ( @{$databases} ) {
         my $tar_ext;
         @$tar_ext = split ( ',', $database->{'Extract_Category'} );
 
-        Check_Directory ( $Temp_Path . '/' . $database->{'Title'} );
+        Check_Directory ( $tmp_path . '/' . $database->{'Title'} );
 
         # BL/category/domains or BL/category/urls
         foreach my $file ( @$tar_files ) {
             foreach my $ext ( @$tar_ext ) {
                 if ( $file eq $database->{'Tar_Prefix'}.'/'.$ext.'/domains' ) {
-                    Check_Directory ( $Temp_Path . '/' . $database->{'Title'} . '/' . $ext );
-                    $tar->extract_file( $file, $Temp_Path . '/' . $database->{'Title'} . '/' . $ext . '/domains' );
-                    if ( $database->{'For'} =~/Bind/ ) {
-                        push ( @$to_extract_for_bind, $Temp_Path . '/' . $database->{'Title'} . '/' . $ext . '/domains' );
+                    Check_Directory ( $tmp_path . '/' . $database->{'Title'} . '/' . $ext );
+                    $tar->extract_file( $file, $tmp_path . '/' . $database->{'Title'} . '/' . $ext . '/domains' );
+                    if ( $database->{'For'} =~/Bind/i ) {
+                        push ( @$to_extract_for_bind, $tmp_path . '/' . $database->{'Title'} . '/' . $ext . '/domains' );
                     }
-                    if ( $database->{'For'} =~/Squid/ ) {
-                        push ( @$to_extract_for_squid, $Temp_Path . '/' . $database->{'Title'} . '/' . $ext . '/domains' );
+                    if ( $database->{'For'} =~/Squid/i ) {
+                        push ( @$to_extract_for_squid, $tmp_path . '/' . $database->{'Title'} . '/' . $ext . '/domains' );
                     }
-
+                    if ( $database->{'For'} =~/Shorewall/i ) {
+                        push ( @$to_extract_for_shorewall, $tmp_path . '/' . $database->{'Title'} . '/' . $ext . '/domains' );
+                    }
+                    if ( $database->{'For'} =~/RBLdns/i ) {
+                        push ( @$to_extract_for_rbldns, $tmp_path . '/' . $database->{'Title'} . '/' . $ext . '/domains' );
+                    }
+                    if ( $database->{'For'} =~/nginx/i ) {
+                        push ( @$to_extract_for_nginx, $tmp_path . '/' . $database->{'Title'} . '/' . $ext . '/domains' );
+                    }
                 } elsif ( $file eq $database->{'Tar_Prefix'}.'/'.$ext.'/urls' ) {
-                    Check_Directory ( $Temp_Path . '/' . $database->{'Title'} . '/' . $ext );
-                    $tar->extract_file( $file, $Temp_Path . '/' . $database->{'Title'} . '/' . $ext . '/urls' );
+                    Check_Directory ( $tmp_path . '/' . $database->{'Title'} . '/' . $ext );
+                    $tar->extract_file( $file, $tmp_path . '/' . $database->{'Title'} . '/' . $ext . '/urls' );
                     if ( $database->{'For'} =~/Squid/ ) {
-                        push ( @$to_extract_for_squid, $Temp_Path . '/' . $database->{'Title'} . '/' . $ext . '/urls' );
+                        push ( @$to_extract_for_squid, $tmp_path . '/' . $database->{'Title'} . '/' . $ext . '/urls' );
                     }
                 }
             }
@@ -695,18 +792,36 @@ foreach my $database ( @{$databases} ) {
         open ( $Fileout, '>'.$database->{'Local'} );
         print $Fileout $content."\n";
         close $Fileout;
-        if ( $database->{'For'} =~/Bind/ ) {
+        if ( $database->{'For'} =~/Bind/i ) {
             push ( @$to_extract_for_bind, $database->{'Local'} );
         }
-        if ( $database->{'For'} =~/Squid/ ) {
+        if ( $database->{'For'} =~/Squid/i ) {
             push ( @$to_extract_for_squid, $database->{'Local'} );
+        }
+        if ( $database->{'For'} =~/Shorewall/i ) {
+            push ( @$to_extract_for_shorewall, $database->{'Local'} );
+        }
+        if ( $database->{'For'} =~/RBLdns/i ) {
+            push ( @$to_extract_for_rbldns, $database->{'Local'} );
+        }
+        if ( $database->{'For'} =~/nginx/i ) {
+            push ( @$to_extract_for_nginx, $database->{'Local'} );
         }
     } elsif ( $local_version == 1 ) {
-        if ( $database->{'For'} =~/Bind/ ) {
+        if ( $database->{'For'} =~/Bind/i ) {
             push ( @$to_extract_for_bind, $database->{'Local'} );
         }
-        if ( $database->{'For'} =~/Squid/ ) {
+        if ( $database->{'For'} =~/Squid/i ) {
             push ( @$to_extract_for_squid, $database->{'Local'} );
+        }
+        if ( $database->{'For'} =~/Shorewall/i ) {
+            push ( @$to_extract_for_shorewall, $database->{'Local'} );
+        }
+        if ( $database->{'For'} =~/RBLdns/i ) {
+            push ( @$to_extract_for_rbldns, $database->{'Local'} );
+        }
+        if ( $database->{'For'} =~/nginx/i ) {
+            push ( @$to_extract_for_nginx, $database->{'Local'} );
         }
     }
 
@@ -718,27 +833,30 @@ foreach my $database ( @{$databases} ) {
     if ($verbose) {
         print "List to extract for Bind:" . Dumper ( $to_extract_for_bind );
         print "List to extract for Squid:" . Dumper ( $to_extract_for_squid );
+        print "List to extract for Shorewall:" . Dumper ( $to_extract_for_shorewall );
+        print "List to extract for RBLdns:" . Dumper ( $to_extract_for_rbldns );
+        print "List to extract for nginx:" . Dumper ( $to_extract_for_nginx );
     }
 
-    if ( $database->{'For'} =~/Bind/ ) {
+    if ( $database->{'For'} =~/Bind/i ) {
         $Blacklist_tmp_Domain = '';
         foreach my $file_to_process ( @$to_extract_for_bind ) {
             $Blacklist_tmp_Domain .= Bind_Dump_to_disk ( $database, $file_to_process );
             $Blacklist_tmp_Domain .= "\n";
 
             my $nb_of_lines = $Blacklist_tmp_Domain =~ tr/\n//;
-            metaprint 'info', "Cummulative number of lines for this Blacklist in '$file_to_process' is '$nb_of_lines'";
+            metaprint 'info', "Cummulative number of lines for this Bind Blacklist in '$file_to_process' is '$nb_of_lines'";
         }
 
         if ( $Blacklist_tmp_Domain !~/^\s*$/ ) {
-            open ( $Fileout, ">>$Blacklist_tmp_file" );
+            open ( $Fileout, ">>$Blacklist_tmp_bind_file" );
             print $Fileout $Blacklist_tmp_Domain."\n";
             close $Fileout;
         } else {
-            metaprint 'Warn', "Suspicious: The output of the processing is empty!";
+            metaprint 'Warn', "Suspicious: The output of Bind processing is empty!";
         }
     }
-    if ( $database->{'For'} =~/Squid/ ) {
+    if ( $database->{'For'} =~/Squid/i ) {
 
         my $squid_dir = $Temp_Path . '/cleanify/' . $database->{'Category'};
         metaprint 'info', "SquidGuard DB dir is $squid_dir" if $verbose;
@@ -807,6 +925,60 @@ foreach my $database ( @{$databases} ) {
             }
         }
     }
+    if ( $database->{'For'} =~/Shorewall/i ) {
+        $Blacklist_tmp_Domain = '';
+        foreach my $file_to_process ( @$to_extract_for_shorewall ) {
+            $Blacklist_tmp_Domain .= Bind_Dump_to_disk ( $database, $file_to_process );
+            $Blacklist_tmp_Domain .= "\n";
+
+            my $nb_of_lines = $Blacklist_tmp_Domain =~ tr/\n//;
+            metaprint 'info', "Cummulative number of lines for this Shorewall Blacklist in '$file_to_process' is '$nb_of_lines'";
+        }
+
+        if ( $Blacklist_tmp_Domain !~/^\s*$/ ) {
+            open ( $Fileout, ">>$Blacklist_tmp_shorewall_file" );
+            print $Fileout $Blacklist_tmp_Domain."\n";
+            close $Fileout;
+        } else {
+            metaprint 'Warn', "Suspicious: The output of shorewall processing is empty!";
+        }
+    }
+    if ( $database->{'For'} =~/RBLdns/i ) {
+        $Blacklist_tmp_Domain = '';
+        foreach my $file_to_process ( @$to_extract_for_rbldns ) {
+            $Blacklist_tmp_Domain .= Bind_Dump_to_disk ( $database, $file_to_process );
+            $Blacklist_tmp_Domain .= "\n";
+
+            my $nb_of_lines = $Blacklist_tmp_Domain =~ tr/\n//;
+            metaprint 'info', "Cummulative number of lines for this RBLdns Blacklist in '$file_to_process' is '$nb_of_lines'";
+        }
+
+        if ( $Blacklist_tmp_Domain !~/^\s*$/ ) {
+            open ( $Fileout, ">>$Blacklist_tmp_rbldns_file" );
+            print $Fileout $Blacklist_tmp_Domain."\n";
+            close $Fileout;
+        } else {
+            metaprint 'Warn', "Suspicious: The output of RBLdns processing is empty!";
+        }
+    }
+    if ( $database->{'For'} =~/nginx/i ) {
+        $Blacklist_tmp_Domain = '';
+        foreach my $file_to_process ( @$to_extract_for_nginx ) {
+            $Blacklist_tmp_Domain .= Bind_Dump_to_disk ( $database, $file_to_process );
+            $Blacklist_tmp_Domain .= "\n";
+
+            my $nb_of_lines = $Blacklist_tmp_Domain =~ tr/\n//;
+            metaprint 'info', "Cummulative number of lines for this nginx Blacklist in '$file_to_process' is '$nb_of_lines'";
+        }
+
+        if ( $Blacklist_tmp_Domain !~/^\s*$/ ) {
+            open ( $Fileout, ">>$Blacklist_tmp_nginx_file" );
+            print $Fileout $Blacklist_tmp_Domain."\n";
+            close $Fileout;
+        } else {
+            metaprint 'Warn', "Suspicious: The output of nginx processing is empty!";
+        }
+    }
 }
 
 print "=============\n\n";
@@ -815,7 +987,7 @@ metaprint 'info', "MASTER processing...";
 
 =head1
 
-Now generating the Master bind blocking list
+Now generating the Master Bind blocking list
 
 =cut
 
@@ -825,7 +997,7 @@ Now generating the Master bind blocking list
 # Bind cannot have IP in the blacklist...
 
 metaprint 'info', "generating Bind_Blacklist_tmp_Domain";
-my $Bind_Blacklist_tmp_Domain = `grep -v '^localhost\$' $Blacklist_tmp_file | grep -v -e '^\$' | tr [A-Z] [a-z] | awk -F. '{ print NF,\$ARGIND }' | sort -n | awk '{ print \$2 }' | uniq | egrep -v "^((25[0-5]|2[0-4][0-9]|[01]?[0-9]?[0-9])\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9]?[0-9])\$" `;
+my $Bind_Blacklist_tmp_Domain = `grep -v '^localhost\$' $Blacklist_tmp_bind_file | grep -v -e '^\$' | tr [A-Z] [a-z] | awk -F. '{ print NF,\$ARGIND }' | sort -n | awk '{ print \$2 }' | uniq | egrep -v "^((25[0-5]|2[0-4][0-9]|[01]?[0-9]?[0-9])\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9]?[0-9])\$" `;
 
 # print Dumper $Blacklist_tmp_Domain;
 
@@ -855,18 +1027,18 @@ $pctsize = (($newsize - $cursize)/$cursize)*100 if $cursize > 0;
 #
 if ($newsize > 0 && $pctsize > -25) {
     if ( $pctsize > 25) {
-        metaprint 'Warn', "BlackList generated contains more than 25% growth... please check ASAP!";
+        metaprint 'Warn', "Bind BlackList generated contains more than 25% growth... please check ASAP!";
     }
     move ($Bind_zone_prod, $Bind_zone_prod_old);
 
     if (move ($Bind_zone_new, $Bind_zone_prod)) {
         metaprint 'info', "Bind BlackList generated/updated correctly.";
     } else {
-        metaprint 'critic', "Move of New BlackList in production failed: $!";
+        metaprint 'critic', "Move of New Bind BlackList in production failed: $!";
         move ($Bind_zone_prod_old, $Bind_zone_prod);
     }
 } else {
-    metaprint 'critic', "More than 25% of rows removed on the black_list, problem suspected.";
+    metaprint 'critic', "More than 25% of rows removed on the Bind black_list, problem suspected.";
     metaprint 'critic', "Process aborted.";
     exit(1);
 }
@@ -877,7 +1049,8 @@ generate_block_file ( $Bind_block_file );
 
 =head1
 
-Now generating the SquidGuard blocking list
+Now generating the SquidGuard blocking list.
+In fact, the rules are already generated, we are only generating the SquidGuard configuration file here.
 
 =cut
 
@@ -927,10 +1100,133 @@ foreach my $cat (sort keys %$squid_cat_to_generate ) {
     print $Fileout "!$tcat ";
 }
 print $Fileout "all\n";
-print $Fileout "    redirect http://127.0.0.1/block.html\n";
+print $Fileout "    pass !in-addr all\n";
+print $Fileout "    pass !dnsbl:$rbldns_ip all\n";
+print $Fileout "    redirect http://$ip4_redirector/block.html\n";
 print $Fileout "  }\n";
 print $Fileout "}\n";
 
 close ($Fileout);
+
+# end of SquidGuard process.
+
+=head1
+
+Now generating the RBLdns configuration and data blocking list.
+
+=cut
+
+my $Blacklist_tmp_rbl_aggr = `grep -v '^localhost\$' $Blacklist_tmp_rbldns_file | grep -v -e '^\$' | sort | uniq | egrep "^((25[0-5]|2[0-4][0-9]|[01]?[0-9]?[0-9])\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9]?[0-9])(\/[0-9]{1,2})?\$"`;
+
+# metaprint 'info', Dumper $Blacklist_tmp_rbl_aggr;
+
+metaprint 'info', "RBLdns generating listing";
+my $Blacklist_rbl_aggr;
+
+# removing IP belonging to range.
+#$Blacklist_rbl_aggr = generate_tree ( $Blacklist_Domain, $Bind_Blacklist_tmp_Domain, $Whitelist_Domain, $debug );
+
+$Blacklist_rbl_aggr = $Blacklist_tmp_rbl_aggr;
+
+# print Dumper ( $Blacklist_rbl_aggr );
+
+open( $Fileout, ">$Rbldns_conf_file_new" );
+print $Fileout ":$ip4_redirector:Known spammer, see http://$ip4_redirector/block.cgi?id=\$\n";
+print $Fileout $Blacklist_rbl_aggr;
+close $Fileout;
+
+## -- Move tmp file to real one
+$newsize = 0;
+$newsize = -s $Rbldns_conf_file_new if (-e $Rbldns_conf_file_new);
+
+#
+$cursize = 0;
+$cursize = -s $Rbldns_conf_file_prod if (-e $Rbldns_conf_file_prod);
+
+#
+$pctsize = 0;
+$pctsize = (($newsize - $cursize)/$cursize)*100 if $cursize > 0;
+
+#
+if ($newsize > 0 && $pctsize > -25) {
+    if ( $pctsize > 25) {
+        metaprint 'Warn', "RBLdns BlackList generated contains more than 25% growth... please check ASAP!";
+    }
+    move ($Rbldns_conf_file_prod, $Rbldns_conf_file_old);
+
+    if (move ($Rbldns_conf_file_new, $Rbldns_conf_file_prod)) {
+        metaprint 'info', "RBLdns BlackList generated/updated correctly.";
+    } else {
+        metaprint 'critic', "Move of New RBLdns BlackList in production failed: $!";
+        move ($Rbldns_conf_file_old, $Rbldns_conf_file_prod);
+    }
+} else {
+    metaprint 'critic', "More than 25% of rows removed on the RBLdns black_list, problem suspected.";
+    metaprint 'critic', "Process aborted.";
+    exit(1);
+}
+
+# end of RBLdns process.
+
+=head1
+
+Now generating the nginx configuration and data blocking list.
+
+=cut
+
+my $Blacklist_tmp_nginx_aggr = `grep -v '^localhost\$' $Blacklist_tmp_rbldns_file | grep -v -e '^\$' | sort | uniq | egrep "^((25[0-5]|2[0-4][0-9]|[01]?[0-9]?[0-9])\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9]?[0-9])(\/[0-9]{1,2})?\$"`;
+
+# metaprint 'info', Dumper $Blacklist_tmp_nginx_aggr;
+
+metaprint 'info', "nginx generating listing";
+my $Blacklist_nginx_aggr;
+
+# removing IP belonging to range.
+#$Blacklist_nginx_aggr = generate_tree ( $Blacklist_Domain, $Bind_Blacklist_tmp_Domain, $Whitelist_Domain, $debug );
+
+$Blacklist_nginx_aggr = $Blacklist_tmp_nginx_aggr;
+
+# print Dumper ( $Blacklist_nginx_aggr );
+
+open( $Fileout, ">$nginx_conf_file_new" );
+foreach my $l ( split ( /\n/, $Blacklist_nginx_aggr ) ) {
+	chomp $l;
+	next if ( $l =~/^\s*$/ );
+	print $Fileout "deny $l;\n";
+}
+close $Fileout;
+
+## -- Move tmp file to real one
+$newsize = 0;
+$newsize = -s $nginx_conf_file_new if (-e $nginx_conf_file_new);
+
+#
+$cursize = 0;
+$cursize = -s $nginx_conf_file_prod if (-e $nginx_conf_file_prod);
+
+#
+$pctsize = 0;
+$pctsize = (($newsize - $cursize)/$cursize)*100 if $cursize > 0;
+
+#
+if ($newsize > 0 && $pctsize > -25) {
+    if ( $pctsize > 25) {
+        metaprint 'Warn', "nginx BlackList generated contains more than 25% growth... please check ASAP!";
+    }
+    move ($nginx_conf_file_prod, $nginx_conf_file_old);
+
+    if (move ($nginx_conf_file_new, $nginx_conf_file_prod)) {
+        metaprint 'info', "nginx BlackList generated/updated correctly.";
+    } else {
+        metaprint 'critic', "Move of New nginx BlackList in production failed: $!";
+        move ($nginx_conf_file_old, $nginx_conf_file_prod);
+    }
+} else {
+    metaprint 'critic', "More than 25% of rows removed on the nginx black_list, problem suspected.";
+    metaprint 'critic', "Process aborted.";
+    exit(1);
+}
+
+# end of nginx process.
 
 exit 0;
