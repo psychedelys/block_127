@@ -7,7 +7,7 @@ Parameters are:
 
 The bind_path is the path to your Bind configuration files. This is typically /etc/bind for no chroot, and /jail/bind/etc for chroot env.
 
-The bind_path parameters is only used for the script deploy_dns.sh, nothing else.
+The bind_path parameters is only used for the script deploy_binddns.sh, nothing else.
 Please review it, to check your env and need.
 
 

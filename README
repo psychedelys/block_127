@@ -30,6 +30,11 @@ Supported format:
   ** Standart squidguard black list.
   ** Adblockplus black list.
 
+*** Nginx:
+
+Only generating a list of badguys for Nginx. So bad guys are getting a HTTP 500 code. bye, bye...
+Supported format:
+  ** IP and subnet in CIDR format.
 
 *** Shorewall (in progress):
 
@@ -53,9 +58,12 @@ CHECK ini/database.ini
 READ the source code, well up-to-you...
 bin/cleanify.pl
 [...Processing...]
+bin/deploy_*dns.sh
+bin/deploy_nginx.sh
+bin/deploy_...
 
 Deploy the configuration is up-to you. According to your setup, and the number of front-end for your load. Everything is differents in each case from deploy localy to deploy on a cluster. But for each time, you just want to generate the file once. The exact methods are from cp to the rsync going though the web services or the BitTorrent protocol (http://engineering.twitter.com/2010/07/murder-fast-datacenter-code-deploys.html)
-So the deploy_dns and deploy_squidguard are mostly here as example, write your own ;-)
+So the deploy_binddns, deploy_powerdns, deploy_squidguard, deploy_nginx are mostly here as example, write your own ;-)
 
 And have fun...
 
