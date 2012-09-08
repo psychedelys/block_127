@@ -17,7 +17,7 @@ nginx_prefix_exec=
 
 In the case of virtualisation with Linux-vserver:
 nginx_prefix_path=/vservers/nginx
-squid_prefix_exec='vserver nginx exec '
+nginx_prefix_exec='vserver nginx exec '
 
 The nginx parameters are only used for the script deploy_nginx.sh, nothing else.
 Please review it, to check your env and need.
