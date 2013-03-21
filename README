@@ -36,7 +36,7 @@ Only generating a list of badguys for Nginx. So bad guys are getting a HTTP 500 
 Supported format:
   ** IP and subnet in CIDR format.
 
-*** Shorewall (in progress):
+*** Shorewall (in progress, but not working on it... might come with something else!):
 
 Simply also add the list to the DROP shorewall blacklist. Be carrefull that this can be really be huged and slow down the connection. Furthermore this should not be considerate as really safe, as some DNS malware are using some well-known IP during most of the time and swap to a dirty IP for a short time period.
 
@@ -86,3 +86,7 @@ Reload time -> < 10s
 Memory Size -> 7 MB
 
 
+Needed packages on a Debian/Ubuntu server.
+
+libdatetime-perl
+libcrypt-ssleay-perl
