@@ -24,6 +24,7 @@ use Date::Format( 'time2str' );
 use File::Basename;
 use Config::IniFiles;
 use File::Spec;
+use Net::SSL;
 
 my $debug   = 0;
 my $verbose = 0;
@@ -35,6 +36,7 @@ sub rec1 ($$$$);
 sub generate_tree ($$$$);
 sub generate_bind_zone_file ($$$$);
 sub generate_block_file ($);
+sub ssl_connect ($$$$$$);
 sub Get_HTTP_File ($$$$);
 sub Bind_Dump_to_disk ($$);
 sub Check_Directory ($);
@@ -77,8 +79,7 @@ if ( !defined( $Bind_Env ) || ( $Bind_Env =~ /^\s*$/ ) ) {
     metaprint 'critic', "The Bind path is empty.";
     exit 1;
 } elsif ( !-d $Bind_Env ) {
-    metaprint 'critic', "The Bind path doesnot exist.";
-    exit 1;
+    metaprint 'critic', "The Bind path doesnot exist. Continuing the generation.";
 }
 my $user_agent = $cfg->val( 'global', 'UA' );
 $user_agent = 'Mozilla/4.73 [en] (X11; I; Linux 2.2.16 i686; Nav)' if ( !defined( $user_agent ) || ( $user_agent =~ /^\s*$/ ) );
@@ -469,13 +470,89 @@ OUT
     close $fileout;
 }
 
+sub ssl_connect ($$$$$$)
+{
+    my ( $method, $host, $port, $path, $user_agent, $debug ) = @_;
+
+    if ( $debug ) {
+        $ENV{HTTPS_DEBUG} = 1;
+    }
+    Net::SSL->send_useragent_to_proxy( 1 );
+    my $sock = Net::SSL->new(
+                              PeerAddr  => $host,
+                              PeerPort  => $port,
+                              SSL_Debug => $debug,
+                              Timeout   => 15,
+    );
+    $sock || ( $@ ||= "no Net::SSL connection established" );
+    my $error = $@;
+    $error && die( "Can't connect to $host:$port; $error; $!" );
+
+    my $out;
+    if ( $debug ) {
+        $out .= "WEB SITE       : $host:$port\n";
+        $out .= "CIPHER         : " . $sock->get_cipher . "\n";
+        my $cert = $sock->get_peer_certificate;
+
+        $out .= "CERT SUBJECT   : " . $cert->subject_name . "\n";
+        $out .= "CERTIFIED BY   : " . $cert->issuer_name . "\n";
+        $out .= "CERT NOT BEFORE: " . $cert->not_before . "\n";
+        $out .= "CERT NOT AFTER : " . $cert->not_after . "\n";
+
+        $out .= "\n";
+        print $out;
+        $out = '';
+    }
+
+    $sock->print( "$method $path HTTP/1.0\n" );
+    $sock->print( "Host: $host\n" );
+    $sock->print( "User-Agent: $user_agent\n\n" );
+    if ( $debug ) {
+        $out .= "HTTP Request : \n";
+        $out .= "$method $path HTTP/1.0\n";
+        $out .= "Host: $host\n";
+        $out .= "User-Agent: $user_agent\n\n";
+        print $out;
+        $out = '';
+    }
+    $out = '';
+
+    my $buf  = '';
+    my $code = 0;
+    while ( $sock->read( $buf, 1024 ) ) {
+        $out .= $buf;
+        if ( ( $buf =~ /^HTTP\/1\.[01]\s(\d+)/ ) && ( !$code ) ) {
+            $code = $1;
+        }
+    }
+    my $res = HTTP::Response->parse( $out );
+
+    return $res;
+}
+
 sub Get_HTTP_File ($$$$)
 {
     my ( $ua, $url, $title, $local ) = @_;
 
     my $local_version = 0;
-    my $req           = HTTP::Request->new( GET => $url );
-    my $req_http      = $ua->request( $req );
+    my $req_http;
+
+    if ( ( $url =~ m|^(https://)?([^/:]+)(:(\d+))?(/.*)?$| ) ) {
+        my ( $host, $port, $path, $method ) = ( $2, $4, $5, 'GET' );
+
+        $port ||= 443;
+        $path ||= '/';
+        unless ( eval { $req_http = ssl_connect( $method, $host, $port, $path, $user_agent, $debug ) } ) {
+            metaprint 'error', "Failed to connect : $@";
+            next;
+        }
+
+    } else {
+
+        my $req = HTTP::Request->new( GET => $url );
+        $req_http = $ua->request( $req );
+
+    }
 
     if ( $req_http->is_success ) {
         if ( $req_http->code != 200 ) {
@@ -511,7 +588,7 @@ sub Bind_Dump_to_disk ($$)
     if ( ( !defined( $database->{'Script'} ) ) || ( $database->{'Script'} =~ /^\s*$/ ) ) {
         return '';
     } elsif ( $database->{'Script'} eq 'v1' ) {
-        my $cmd = "grep -v '^#' $file | grep -v -e '^\$' | grep -v '^localhost\$' | awk -F. '{ print NF,\$ARGIND }' | sort -n | awk '{ print \$2 }' | uniq";
+        my $cmd = "grep -v '^#' $file | grep -v -e '^\$' | grep -v '^localhost\$' | grep -v '^Site\$' | awk -F. '{ print NF,\$ARGIND }' | sort -n | awk '{ print \$2 }' | uniq";
         $Blacklist_tmp_Domain = `$cmd`;
     } elsif ( $database->{'Script'} eq 'v2' ) {
         my $cmd = "grep -v '^#' $file | grep -v -e '^\$' | grep -v '^localhost\$' | sed -e 's/\\\././g' -e 's/^\.//' | awk -F. '{ print NF,\$ARGIND }' | sort -n | awk '{ print \$2 }' | uniq";
@@ -613,6 +690,19 @@ Initialisation of the Web Content fetcher
 my $ua = LWP::UserAgent->new( agent => $user_agent );
 if ( defined( $http_proxy ) && ( $http_proxy !~ /^\s*$/ ) ) {
     $ua->proxy( 'http', $http_proxy );
+
+    $ENV{HTTPS_PROXY} = $http_proxy;
+
+    #Also define the proxy for SSL connection
+    if ( $http_proxy =~ /^(http:\/\/)([^\/:]+):([^@]+)@([^\/]+\/(.*))$/ ) {
+        $ENV{HTTPS_PROXY} = $1 . $4;
+        my $http_proxy_user   = $2;
+        my $http_proxy_passwd = $3;
+        if ( defined( $http_proxy_user ) && defined( $http_proxy_passwd ) && ( $http_proxy_user !~ /^\s*$/ ) && ( $http_proxy_passwd !~ /^\s*$/ ) ) {
+            $ENV{HTTPS_PROXY_USERNAME} = $http_proxy_user;
+            $ENV{HTTPS_PROXY_PASSWORD} = $http_proxy_passwd;
+        }
+    }
 }
 $ua->timeout( 10 );
 
