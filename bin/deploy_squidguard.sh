@@ -43,11 +43,13 @@ TMP_PATH=${resources_path}
 SQUID_PREFIX_PATH=${squid_prefix_path}
 SQUID_PREFIX_EXEC=${squid_prefix_exec}
 SQUID_CONF_PATH=${squid_conf_path}
+SQUIDGUARD_CONF_PATH=${squidguard_conf_path}
 SQUID_DB_PATH=${squid_db_path}
 
 echo "TMP_PATH is ${TMP_PATH}"
 echo "SQUID_PREFIX_PATH is ${SQUID_PREFIX_PATH}"
 echo "SQUID_CONF_PATH is ${SQUID_CONF_PATH}"
+echo "SQUIDGUARD_CONF_PATH is ${SQUIDGUARD_CONF_PATH}"
 echo "SQUID_DB_PATH is ${SQUID_DB_PATH}"
 echo "SQUID_PREFIX_EXEC is ${SQUID_PREFIX_EXEC}"
 
@@ -62,14 +64,14 @@ fi
 
 echo "Backuping the current squidGuard.conf config file."
 
-if [ -f "${SQUID_PREFIX_PATH}/${SQUID_CONF_PATH}/squidGuard.conf" ]; then
-  cp "${SQUID_PREFIX_PATH}/${SQUID_CONF_PATH}/squidGuard.conf" "${SQUID_PREFIX_PATH}/${SQUID_CONF_PATH}/squidGuard.conf.old"
+if [ -f "${SQUID_PREFIX_PATH}/${SQUIDGUARD_CONF_PATH}/squidGuard.conf" ]; then
+  cp "${SQUID_PREFIX_PATH}/${SQUIDGUARD_CONF_PATH}/squidGuard.conf" "${SQUID_PREFIX_PATH}/${SQUIDGUARD_CONF_PATH}/squidGuard.conf.old"
 fi
 
 echo "Copying the new squidGuard.conf file."
 
 if [ -f ${TMP_PATH}/squidGuard.conf ]; then
-  cp ${TMP_PATH}/squidGuard.conf "${SQUID_PREFIX_PATH}/${SQUID_CONF_PATH}/squidGuard.conf"
+  cp ${TMP_PATH}/squidGuard.conf "${SQUID_PREFIX_PATH}/${SQUIDGUARD_CONF_PATH}/squidGuard.conf"
 else
   echo "New squidGuard.conf conf files is not found, exiting";
   exit 1
